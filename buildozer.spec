@@ -13,7 +13,7 @@ android.minapi = 24
 android.ndk = 29
 android.archs = arm64-v8a
 android.accept_sdk_license = True
-android.release_artifact = aab
+android.release_artifact = apk
 p4a.bootstrap = sdl2
 p4a.branch = develop
 [buildozer]
