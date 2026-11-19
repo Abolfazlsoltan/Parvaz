@@ -1,5 +1,6 @@
 import math, random, json, os
 from kivy.uix.widget import Widget
+from kivy.app import App
 from kivy.clock import Clock
 from kivy.graphics import Color, Ellipse, Line, Rectangle, Triangle
 from kivy.core.text import Label as CoreLabel
@@ -25,7 +26,7 @@ class NeonSurvivor(Widget):
 
     def load_high(self):
         try:
-            with open(os.path.join(__import__('kivy'). App.get_running_app().user_data_dir,'record.json')) as f:
+            with open(os.path.join(App.get_running_app().user_data_dir,'record.json')) as f:
                 self.high=json.load(f).get('high',0)
         except Exception: pass
 
@@ -42,7 +43,7 @@ class NeonSurvivor(Widget):
         self.dash=0; self.dash_cd=0; self.inv=0; self.shield=False; self.triple=0
         self.joy=None; self.move=[0,0]; self.last_dt=1/60
 
-    def pos(self,p):
+    def map_pos(self,p):
         return (self.x+p[0]*self.width,self.y+p[1]*self.height)
     def norm(self,x,y):
         m=math.hypot(x,y)
@@ -168,7 +169,7 @@ class NeonSurvivor(Widget):
         if not self.width or not self.height: return
         self.canvas.clear()
         with self.canvas:
-            Color(*rgba(BG)); Rectangle(pos=self.pos((0,0)),size=self.size)
+            Color(*rgba(BG)); Rectangle(pos=self.map_pos((0,0)),size=self.size)
             Color(*rgba("#141A32"))
             for i in range(1,12):
                 x=self.x+self.width*i/12; Line(points=[x,self.y,x,self.top],width=dp(.5))
