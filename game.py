@@ -176,14 +176,14 @@ class NeonSurvivor(Widget):
             for i in range(1,8):
                 y=self.y+self.height*i/8; Line(points=[self.x,y,self.right,y],width=dp(.5))
             for p in self.particles:
-                Color(*rgba(p[5],max(0,p[4]*1.8))); Ellipse(pos=self.pos((p[0]-.006,p[1]-.006)),size=(dp(5),dp(5)))
+                Color(*rgba(p[5],max(0,p[4]*1.8))); Ellipse(pos=self.map_pos((p[0]-.006,p[1]-.006)),size=(dp(5),dp(5)))
             for b in self.bullets:
-                Color(*rgba(CYAN)); Ellipse(pos=self.pos((b[0]-.007,b[1]-.007)),size=(dp(8),dp(8)))
+                Color(*rgba(CYAN)); Ellipse(pos=self.map_pos((b[0]-.007,b[1]-.007)),size=(dp(8),dp(8)))
             for e in self.enemies:
                 c={"chaser":PINK,"dart":GOLD,"tank":PURPLE}[e[2]]
-                x,y=self.pos(e[:2]); r=dp({"chaser":12,"dart":9,"tank":21}[e[2]])
+                x,y=self.map_pos(e[:2]); r=dp({"chaser":12,"dart":9,"tank":21}[e[2]])
                 Color(*rgba(c)); Line(circle=(x,y,r),width=dp(2)); Ellipse(pos=(x-r*.35,y-r*.35),size=(r*.7,r*.7))
-            x,y=self.pos(self.player); r=dp(14)
+            x,y=self.map_pos(self.player); r=dp(14)
             Color(*rgba(CYAN, .25)); Ellipse(pos=(x-r*1.8,y-r*1.8),size=(r*3.6,r*3.6))
             Color(*rgba(CYAN)); Line(circle=(x,y,r),width=dp(2)); Ellipse(pos=(x-r*.45,y-r*.45),size=(r*.9,r*.9))
             if self.shield:
