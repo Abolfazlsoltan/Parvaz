@@ -28,6 +28,6 @@ jobs:
         run: buildozer android release
       - uses: actions/upload-artifact@v4
         with:
-          name: neon-survivor-android-release
-          path: bin/*.aab
+          name: neon-survivor-android-apk
+          path: bin/*.apk
           if-no-files-found: error
