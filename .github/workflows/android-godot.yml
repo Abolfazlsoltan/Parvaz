@@ -1,0 +1,30 @@
+name: Build Neon Survivor Godot Android APK
+
+on:
+  push:
+    branches: [godot-v3.5-migration]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/android-godot.yml'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Prepare build directory
+        run: mkdir -p godot/build
+      - name: Import project resources
+        run: godot --headless --editor --path godot --import
+      - name: Export Android APK
+        run: godot --headless --path godot --export-debug "Android" godot/build/NeonSurvivor.apk
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeonSurvivor-Android
+          path: godot/build/NeonSurvivor.apk
+          if-no-files-found: error
