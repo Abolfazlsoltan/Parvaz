@@ -139,7 +139,23 @@ func _ready() -> void:
  get_viewport().size_changed.connect(_resize)
 
 func _resize() -> void:
+ var old_size := viewport_size
  viewport_size = get_viewport_rect().size
+ if old_size.x > 0.0 and old_size.y > 0.0:
+  var scale_factor := viewport_size / old_size
+  # Preserve the space scene when Android changes between portrait and landscape.
+  for star in stars:
+   star.pos *= scale_factor
+  for layer in nebula_layers:
+   layer.pos *= scale_factor
+  for structure in background_structures:
+   structure.pos *= scale_factor
+  player *= scale_factor
+  previous_player = player
+  drag_delta *= scale_factor
+  var margin := float(_ship().size + 6)
+  player.x = clampf(player.x, margin, viewport_size.x - margin)
+  player.y = clampf(player.y, margin + 40.0, viewport_size.y - margin)
  queue_redraw()
 
 func _build_background_gradient() -> void:
