@@ -138,6 +138,11 @@ func _ready() -> void:
  _reset_run()
  get_viewport().size_changed.connect(_resize)
 
+func _notification(what: int) -> void:
+ # Flush progress when Android suspends the app or the window is closed.
+ if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
+  _save()
+
 func _resize() -> void:
  var old_size := viewport_size
  viewport_size = get_viewport_rect().size
