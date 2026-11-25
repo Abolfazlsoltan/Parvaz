@@ -98,6 +98,8 @@ var tutorial_done := false
 var tutorial_active := false
 var achievements: Array[String] = []
 var stars: Array[Dictionary] = []
+var nebula_layers: Array[Dictionary] = []
+var background_structures: Array[Dictionary] = []
 var bullets: Array[Dictionary] = []
 var enemy_bullets: Array[Dictionary] = []
 var enemies: Array[Dictionary] = []
@@ -139,8 +141,16 @@ func _resize() -> void:
 
 func _create_stars() -> void:
  stars.clear()
+ nebula_layers.clear()
+ background_structures.clear()
  for i in range(55):
-  stars.append({"pos":Vector2(rng.randf_range(0,viewport_size.x),rng.randf_range(0,viewport_size.y)),"speed":rng.randf_range(0.35,1.0)})
+  var star_size:=rng.randf_range(0.35,1.0)
+  stars.append({"pos":Vector2(rng.randf_range(0,viewport_size.x),rng.randf_range(0,viewport_size.y)),"speed":star_size,"size":star_size})
+ var nebula_colors:Array[Color]=[Color("#122044"),Color("#24143A"),Color("#0E2C40")]
+ for i in range(3):
+  nebula_layers.append({"pos":Vector2(rng.randf_range(0,viewport_size.x),rng.randf_range(0,viewport_size.y)),"radius":rng.randf_range(60.0,130.0),"color":nebula_colors[i],"speed":rng.randf_range(8.0,16.0)})
+ for i in range(2):
+  background_structures.append({"pos":Vector2(rng.randf_range(40,viewport_size.x-40),rng.randf_range(40,viewport_size.y-40)),"size":rng.randf_range(40.0,85.0)})
 
 func _ship() -> Dictionary:
  for ship in SHIPS:
@@ -483,7 +493,7 @@ func _process(delta: float) -> void:
  var dt := minf(delta,0.033)
  touch_ripple_time=maxf(0.0,touch_ripple_time-dt)
  for star in stars:
-  star.pos.y = fposmod(star.pos.y+22.0*dt,viewport_size.y)
+  star.pos.y = fposmod(star.pos.y+22.0*star.speed*dt,viewport_size.y)
  if state!="play" or paused or tutorial_active:
   flash_time=maxf(0.0,flash_time-dt)
   screen_shake=maxf(0.0,screen_shake-44.0*dt)
@@ -915,12 +925,38 @@ func _click_ui(pos: Vector2) -> void:
 func _draw() -> void:
  var size:=get_viewport_rect().size
  viewport_size=size
- draw_rect(Rect2(Vector2.ZERO,size),BG)
- for i in range(12):
-  draw_line(Vector2(size.x*i/12.0,0),Vector2(size.x*i/12.0,size.y),GRID,1)
- for i in range(8):
-  draw_line(Vector2(0,size.y*i/8.0),Vector2(size.x,size.y*i/8.0),GRID,1)
- for star in stars:draw_circle(star.pos,1.5,Color(0.5,0.75,1,0.35))
+ # Source V3.5 background gradient, subdued orbital nebulae and structural silhouettes.
+ var bands:=48
+ for i in range(bands):
+  var t:=float(i)/float(bands-1)
+  var col:=Color(0.035,0.063,0.145).lerp(Color(0.012,0.019,0.055),t)
+  var y0:=i*size.y/bands
+  var y1:=(i+1)*size.y/bands
+  draw_rect(Rect2(0,y0,size.x,maxf(1.0,y1-y0)),col)
+ for layer in nebula_layers:
+  var p:Vector2=layer.pos
+  var radius:float=layer.radius
+  var c:Color=layer.color
+  draw_set_transform(p,0,Vector2(radius,radius*0.35))
+  draw_arc(Vector2.ZERO,1.0,0,TAU,56,Color(c,0.18),2.0)
+  draw_arc(Vector2.ZERO,0.72,0,TAU,48,Color(c,0.10),2.0)
+  draw_set_transform(Vector2.ZERO)
+ for structure in background_structures:
+  var p:Vector2=structure.pos
+  var w:float=structure.size
+  var rect:=Rect2(p.x-w*0.5,p.y-w*0.35,w,w*0.7)
+  draw_rect(rect,Color(0.02,0.035,0.075,0.45),false,1)
+  draw_line(rect.position,rect.position+rect.size,Color(0.02,0.035,0.075,0.55),1)
+ var grid_step:=66.0
+ for x in range(0,ceili(size.x/grid_step)+1):
+  var gx:=x*grid_step
+  draw_line(Vector2(gx,0),Vector2(gx,size.y),Color("#0D111F"),1)
+ for y in range(0,ceili(size.y/grid_step)+1):
+  var gy:=y*grid_step
+  draw_line(Vector2(0,gy),Vector2(size.x,gy),Color("#0D111F"),1)
+ for star in stars:
+  var c:=0.33+0.57*star.size
+  draw_circle(star.pos,maxf(1.0,star.size*1.5),Color(c,c,minf(1.0,c+0.06),0.78))
  if touch_ripple_time>0.0:
   var progress:=1.0-touch_ripple_time/0.25
   draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
@@ -937,7 +973,7 @@ func _draw() -> void:
   _button(Rect2(size.x*0.2,size.y*0.43,size.x*0.6,58),"RESUME",CYAN)
   _button(Rect2(size.x*0.2,size.y*0.54,size.x*0.6,58),"RESTART",GOLD)
   _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,58),"MAIN MENU",PINK)
- if tutorial_active:_draw_overlay(size,"FLIGHT TRAINING","DRAG TO MOVE • TAP DASH TO EVADE",GOLD)
+ if tutorial_active:_draw_overlay(size,"FLIGHT TRAINING","DRAG TO MOVE • DOUBLE TAP TO DASH",GOLD)
  if flash_time>0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
 
 func _draw_game() -> void:
