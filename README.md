@@ -1,36 +1,26 @@
-# Neon Survivor — Android
+# Neon Survivor — Godot Android
 
-A touch-first Android adaptation of the supplied **NEON SURVIVOR** Pygame prototype.
+نسخهٔ اصلی پروژه با **Godot 4.4.1 و GDScript** ساخته می‌شود. ساخت APK از طریق GitHub Actions انجام می‌شود.
 
-## Play
-- Drag on the left half of the screen to move.
-- Tap the right half to dash.
-- The game auto-targets the nearest enemy and fires automatically.
-- Collect shield, triple-shot and nova power-ups.
-- Tap the screen to start/restart; use the pause button in the top-right.
+## اجرای بازی
+- با کشیدن انگشت در نیمهٔ چپ صفحه، بازیکن را حرکت دهید.
+- با لمس سمت راست صفحه، Dash اجرا کنید.
+- شلیک به نزدیک‌ترین دشمن به‌صورت خودکار انجام می‌شود.
+- سه تقویت‌کنندهٔ Shield، Triple Shot و Nova در بازی وجود دارند.
+- برای شروع یا شروع دوباره، صفحه را لمس کنید.
+- با کلید P یا Escape بازی را متوقف/ادامه دهید.
 
-## Project layout
-- `main.py`: Kivy application shell and Android back-key handling.
-- `game.py`: gameplay, enemies, collision, effects, HUD and touch controls.
-- `buildozer.spec`: Android package/build configuration.
-- `.github/workflows/android.yml`: CI build for a release Android App Bundle.
+## ساخت APK
+1. وارد زبانهٔ **Actions** مخزن شوید.
+2. Workflow با نام **Build Neon Survivor Android APK** را انتخاب کنید.
+3. اجرای خودکار پس از Push به شاخهٔ `main` انجام می‌شود؛ یا از گزینهٔ **Run workflow** استفاده کنید.
+4. پس از موفقیت، فایل `NeonSurvivor-Android-APK` را از بخش Artifacts همان اجرا دریافت کنید.
 
-## Build
-The GitHub Actions workflow builds a release AAB on pushes to `main` or manually from Actions. Download the generated artifact from the workflow run.
+## ساختار پروژه
+- `godot/project.godot`: تنظیمات پروژه
+- `godot/main.tscn`: صحنهٔ اصلی
+- `godot/scripts/main.gd`: منطق بازی، کنترل لمسی، دشمن‌ها، تیراندازی، امتیاز و رابط بصری
+- `godot/export_presets.cfg`: تنظیمات خروجی Android
+- `.github/workflows/android.yml`: ساخت و انتشار Artifact فایل APK
 
-For local builds, install Buildozer and run:
-```bash
-buildozer android debug
-buildozer android release
-```
-
-## Google Play checklist
-Before production submission:
-1. Set a unique permanent application ID in `buildozer.spec`.
-2. Configure a secure upload keystore and signing credentials; never commit them.
-3. Verify the target API level against the current Play Console requirement.
-4. Test on multiple Android devices, including touch, pause/resume, audio, performance and saved records.
-5. Prepare store listing, privacy policy (if applicable), screenshots, icon and content rating.
-6. Upload the signed AAB to an internal testing track before production.
-
-This repository provides the game source and CI packaging workflow; a successful build alone does not guarantee Play Store approval.
+این Workflow یک APK آزمایشیِ امضاشده با کلید موقت CI می‌سازد؛ برای انتشار در فروشگاه باید کلید انتشار اختصاصی و امن تنظیم شود.
