@@ -29,7 +29,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: platform-tools platforms;android-35 build-tools;35.0.0 cmdline-tools;latest cmake;3.10.2.4988404 ndk;23.2.8568313
+          packages: platform-tools platforms;android-34 build-tools;34.0.0 cmdline-tools;latest cmake;3.10.2.4988404 ndk;23.2.8568313
 
       - name: Install Godot 4.4.1 and export templates
         shell: bash
@@ -64,6 +64,19 @@ jobs:
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
+
+      - name: Verify Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -d "$ANDROID_HOME/platforms/android-34"
+          test -d "$ANDROID_HOME/build-tools/34.0.0"
+          test -d "$ANDROID_HOME/ndk/23.2.8568313"
+          test -d "$ANDROID_HOME/cmake/3.10.2.4988404"
+          test -x "$JAVA_HOME/bin/java"
+          test -s "$HOME/.android/debug.keystore"
+          echo "Android SDK, NDK, CMake, Java and debug keystore are present."
 
       - name: Validate Godot project
         run: godot --headless --path godot --editor --quit
