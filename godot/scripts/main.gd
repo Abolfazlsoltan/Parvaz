@@ -121,6 +121,7 @@ var drag_delta := Vector2.ZERO
 var dash_requested := false
 var flash_time := 0.0
 var screen_shake := 0.0
+var screen_shake_offset := Vector2.ZERO
 var uid := 0
 
 func _ready() -> void:
@@ -977,7 +978,8 @@ func _draw() -> void:
   var progress:=1.0-touch_ripple_time/0.25
   draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
  if state=="play" or state=="over":
-  if screen_shake>0.1:draw_set_transform(Vector2(rng.randf_range(-screen_shake,screen_shake),rng.randf_range(-screen_shake,screen_shake)),0,Vector2.ONE)
+  screen_shake_offset=Vector2(rng.randf_range(-screen_shake,screen_shake),rng.randf_range(-screen_shake,screen_shake)) if screen_shake>0.1 else Vector2.ZERO
+  draw_set_transform(screen_shake_offset,0,Vector2.ONE)
   _draw_game()
   draw_set_transform(Vector2.ZERO)
  match state:
@@ -1041,10 +1043,10 @@ func _draw_player() -> void:
  var t:=Time.get_ticks_msec()/1000.0
  var thrust:=clampf(velocity.length()/480.0,0.25,1.0)
  var flicker:=1.0+0.22*sin(t*26.0)
- draw_set_transform(player+Vector2(18,24),aim_angle+PI/2,Vector2.ONE)
+ draw_set_transform(player+screen_shake_offset+Vector2(18,24),aim_angle+PI/2,Vector2.ONE)
  # Ground shadow, matching the original's elevated aircraft presentation.
  draw_colored_polygon(PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.8,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.8,r*0.55)]),Color(0.01,0.02,0.06,0.38))
- draw_set_transform(player,aim_angle+PI/2+bank*0.14,Vector2.ONE)
+ draw_set_transform(player+screen_shake_offset,aim_angle+PI/2+bank*0.14,Vector2.ONE)
  # Twin/triple afterburners with animated inner hot core.
  var engines: Array[float]=[-r*0.28,r*0.28]
  if cfg.id=="titan":engines=[-r*0.38,0.0,r*0.38]
@@ -1107,9 +1109,9 @@ func _draw_enemy(enemy: Dictionary) -> void:
  if critical and enemy.flash<=0:col=Color(1.0,0.22,0.30)
  var hull_angle:float=enemy.aim
  if enemy.kind=="gunship":hull_angle=enemy.get("hull_angle",PI/2)
- draw_set_transform(enemy.pos+Vector2(15,20),hull_angle+PI/2,Vector2.ONE)
+ draw_set_transform(enemy.pos+screen_shake_offset+Vector2(15,20),hull_angle+PI/2,Vector2.ONE)
  draw_colored_polygon(PackedVector2Array([Vector2(0,-r),Vector2(r*0.65,r*0.45),Vector2(0,r*0.65),Vector2(-r*0.65,r*0.45)]),Color(0.01,0.02,0.07,0.42))
- draw_set_transform(enemy.pos,hull_angle+PI/2,Vector2.ONE)
+ draw_set_transform(enemy.pos+screen_shake_offset,hull_angle+PI/2,Vector2.ONE)
  var flame_len:=r*(0.65+0.22*sin(t*18.0+enemy.uid))
  if enemy.kind=="interceptor":
   for side in [-1.0,1.0]:
@@ -1158,6 +1160,7 @@ func _draw_enemy(enemy: Dictionary) -> void:
   var bw:=r*1.6
   draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw,4),Color(0.16,0.08,0.22))
   draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw*hp_frac,4),col)
+ draw_set_transform(screen_shake_offset,0,Vector2.ONE)
 func _draw_hud(size: Vector2) -> void:
  var portrait:=size.y>size.x
  if portrait:
