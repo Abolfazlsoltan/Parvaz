@@ -1089,7 +1089,7 @@ func _draw_player() -> void:
  var blink:=1.0 if int(t*1000)%700<180 else 0.35
  draw_circle(Vector2(-r*0.35,-r*1.05),maxf(2.0,r*0.10),Color(1.0,0.22,0.3,blink))
  draw_circle(Vector2(r*0.35,-r*1.05),maxf(2.0,r*0.10),Color(0.25,1.0,0.55,blink))
- draw_set_transform(Vector2.ZERO)
+ draw_set_transform(screen_shake_offset,0,Vector2.ONE)
  if shield:
   var shield_r:=r*1.65+2.5*sin(t*9.0)
   draw_arc(player,shield_r,0,TAU,48,CYAN,2)
@@ -1152,7 +1152,7 @@ func _draw_enemy(enemy: Dictionary) -> void:
    var mount2:=Vector2(r*0.08,side*r*0.56)
    draw_arc(mount2,r*0.14,0,TAU,20,col,2)
    draw_line(mount2,mount2+track2*r*0.36,Color.WHITE,3)
- draw_set_transform(Vector2.ZERO)
+ draw_set_transform(screen_shake_offset,0,Vector2.ONE)
  # Boss health ring, gunship health bar only after damage.
  if enemy.kind=="boss":
   draw_arc(enemy.pos,r+18,-PI/2,-PI/2+TAU*maxf(0.03,hp_frac),64,col,4)
