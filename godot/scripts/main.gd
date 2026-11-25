@@ -723,6 +723,7 @@ func _check_achievements() -> void:
    achievements.append(achievement_id)
    for entry in ACHIEVEMENTS:
     if entry.id==achievement_id:
+     if sound_bank!=null:sound_bank.play_sfx("achievement")
      _popup(player,"ACHIEVEMENT: "+entry.name,GOLD)
      credits+=500
      break
@@ -845,6 +846,9 @@ func _click_ui(pos: Vector2) -> void:
       _save()
  elif state=="settings":
   if pos.y<h*0.15:state="menu"
+  elif pos.y>=h*0.20 and pos.y<h*0.28:
+   achievements_return_state="settings"
+   state="achievements"
   elif pos.y<h*0.38:
    var choices: Array[String]=["easy","normal","hard","nightmare"]
    difficulty=choices[clampi(int(pos.x/(w/4.0)),0,3)]
@@ -1114,6 +1118,7 @@ func _draw_settings(size: Vector2) -> void:
  _text("SYSTEM SETTINGS",Vector2(size.x*0.5,size.y*0.16),38,CYAN)
  _button(Rect2(12,12,130,48),"BACK",GOLD)
  _text("DIFFICULTY",Vector2(size.x*0.5,size.y*0.30),22,Color.WHITE)
+ _button(Rect2(size.x*0.18,size.y*0.22,size.x*0.64,size.y*0.055),"ACHIEVEMENTS %d/%d • KILLS %d" % [achievements.size(),ACHIEVEMENTS.size(),total_kills],GOLD)
  var ids:Array[String]=["easy","normal","hard","nightmare"]
  for i in range(4):
   var rect:=Rect2(i*size.x/4+5,size.y*0.34,size.x/4-10,56)
