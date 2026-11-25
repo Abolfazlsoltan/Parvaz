@@ -977,21 +977,42 @@ func _draw() -> void:
  if flash_time>0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
 
 func _draw_game() -> void:
- for trail in trails:draw_circle(trail.pos,8.0*trail.time/trail.max,Color(_ship().primary,0.24*trail.time/trail.max))
- for wave in shockwaves:draw_arc(wave.pos,wave.radius,0,TAU,40,Color(wave.color,wave.time/wave.max),3)
+ var pcol:Color=_ship().primary
+ for trail in trails:
+  var alpha:=0.24*trail.time/trail.max
+  draw_circle(trail.pos,11.0*trail.time/trail.max,Color(pcol,alpha))
+ for wave in shockwaves:
+  draw_arc(wave.pos,wave.radius,0,TAU,40,Color(wave.color,wave.time/wave.max),3)
  for bullet in bullets:
-  draw_line(bullet.pos,bullet.pos-bullet.dir*18,bullet.color,3)
-  draw_circle(bullet.pos,3.5,bullet.color)
- for bullet in enemy_bullets:draw_circle(bullet.pos,bullet.radius,PINK)
- for enemy in enemies:_draw_enemy(enemy)
+  var tail:=bullet.pos-bullet.dir*22.0
+  draw_line(bullet.pos,tail,bullet.color,3)
+  draw_line(bullet.pos,tail,Color(1,1,1,0.9),1)
+  if not OS.has_feature("android"):draw_arc(bullet.pos,10,0,TAU,20,Color(bullet.color,0.22),2)
+ for bullet in enemy_bullets:
+  draw_circle(bullet.pos,bullet.radius,PINK)
+  draw_arc(bullet.pos,bullet.radius,0,TAU,20,Color.WHITE,1)
+ for enemy in enemies:
+  if not OS.has_feature("android"):draw_arc(enemy.pos,enemy.r*1.8,0,TAU,24,Color(ENEMY_TYPES[enemy.kind].color,0.12),3)
+  _draw_enemy(enemy)
+ var target:=_nearest_enemy()
+ if target!=null:
+  var tr:float=target.r+11.0
+  draw_arc(target.pos,tr,0,TAU,32,Color.WHITE,1)
+  draw_arc(target.pos,tr+4,0,TAU,32,PINK,1)
  for item in powerups:
   var col:Color=POWERUPS[item.kind].color
-  draw_circle(item.pos,17,Color(col,0.15))
-  draw_arc(item.pos,14,0,TAU,28,col,2)
-  _text(POWERUPS[item.kind].symbol,item.pos+Vector2(0,6),18,col)
- for particle in particles:draw_circle(particle.pos,particle.size,Color(particle.color,clampf(particle.life/particle.max,0,1)))
+  if item.time>3.0 or int(item.time*7.0)%2==0:
+   draw_circle(item.pos,19,Color(col,0.12))
+   draw_circle(item.pos,17,Color(0.055,0.08,0.15,0.95))
+   draw_arc(item.pos,17,0,TAU,28,col,2)
+   _text(POWERUPS[item.kind].symbol,item.pos+Vector2(0,6),18,col)
+ for particle in particles:
+  var alpha:=clampf(particle.life/particle.max,0.0,1.0)
+  draw_circle(particle.pos,particle.size*alpha,Color(particle.color,alpha))
  for popup in popups:_text(popup.text,popup.pos,16,Color(popup.color,popup.time/popup.max))
- _draw_player()
+ if not (invulnerable>0.0 and int(invulnerable*14.0)%2==0):
+  if not OS.has_feature("android"):draw_arc(player,58,0,TAU,32,Color(pcol,0.10),8)
+  _draw_player()
 
 func _draw_player() -> void:
  var cfg:=_ship()
