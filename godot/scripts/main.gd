@@ -44,6 +44,7 @@ var rng := RandomNumberGenerator.new()
 var sound_bank: Node
 var viewport_size := Vector2(960,540)
 var state := "menu"
+var achievements_return_state := "menu"
 var paused := false
 var difficulty := "normal"
 var selected_ship := "viper"
@@ -819,7 +820,9 @@ func _click_ui(pos: Vector2) -> void:
   if Rect2(w*0.18,h*0.50,w*0.64,h*0.10).has_point(pos):_start_run()
   elif Rect2(w*0.18,h*0.62,w*0.64,h*0.09).has_point(pos):state="hangar"
   elif Rect2(w*0.18,h*0.73,w*0.64,h*0.09).has_point(pos):state="settings"
-  elif Rect2(w*0.18,h*0.84,w*0.64,h*0.09).has_point(pos):state="achievements"
+  elif Rect2(w*0.18,h*0.84,w*0.64,h*0.09).has_point(pos):
+   achievements_return_state="menu"
+   state="achievements"
  elif state=="hangar":
   if pos.y<h*0.12:state="menu"
   else:
@@ -852,7 +855,10 @@ func _click_ui(pos: Vector2) -> void:
    if not muted and state=="play" and sound_bank!=null:sound_bank.start_music()
    _save()
   elif pos.y<h*0.72:target_fps=60 if target_fps==45 else 45;_save()
- elif state=="achievements":state="menu"
+  elif pos.y<h*0.80:
+   achievements_return_state="settings"
+   state="achievements"
+ elif state=="achievements":state=achievements_return_state
  elif state=="over":
   if pos.y>h*0.74:state="menu"
   else:_start_run()
@@ -1029,23 +1035,45 @@ func _draw_enemy(enemy: Dictionary) -> void:
   draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw,4),Color(0.16,0.08,0.22))
   draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw*hp_frac,4),col)
 func _draw_hud(size: Vector2) -> void:
- _text("SCORE  %d" % score,Vector2(size.x*0.16,34),20,Color.WHITE)
- _text("BEST  %d" % high_score,Vector2(size.x*0.16,56),13,Color("#A5B4D6"))
- _text("STAGE %d • WAVE %d/%d" % [stage,subwave,total_subwaves],Vector2(size.x*0.5,34),18,GOLD)
- _text("HULL %d/%d" % [hp,max_hp],Vector2(size.x*0.83,34),18,PINK)
- _text("CREDITS %d" % credits,Vector2(size.x*0.83,56),13,GOLD)
- draw_rect(Rect2(18,size.y-22,130,6),Color("#25324D"))
- draw_rect(Rect2(18,size.y-22,130*(1.0-dash_cooldown/_ship().dash),6),CYAN)
- _text("DASH",Vector2(18,size.y-34),13,CYAN,false)
+ var portrait:=size.y>size.x
+ if portrait:
+  _text("%d" % score,Vector2(18,34),23,Color.WHITE,false)
+  _text(_ship().name,Vector2(18,58),13,_ship().primary,false)
+  for i in range(max_hp):
+   var col:=PINK if i<hp else Color("#373750")
+   draw_colored_polygon(PackedVector2Array([Vector2(22+i*25,72),Vector2(31+i*25,82),Vector2(22+i*25,92),Vector2(13+i*25,82)]),col)
+  _text("STAGE %d • WAVE %d/%d" % [stage,subwave,total_subwaves],Vector2(size.x*0.5,122),16,GOLD)
+  var bar_w:=minf(260.0,size.x*0.68)
+  var bar_x:=size.x*0.5-bar_w*0.5
+  draw_rect(Rect2(bar_x,139,bar_w,8),Color("#252D4A"))
+  var segment:=bar_w/float(maxi(1,total_subwaves))
+  for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,141,maxf(2.0,segment-4),4),GOLD)
+  _text("CREDITS %d" % credits,Vector2(18,size.y-142),14,GOLD,false)
+ else:
+  _text("SCORE %d" % score,Vector2(18,32),21,Color.WHITE,false)
+  _text("%s • CR %d" % [_ship().name,credits],Vector2(18,56),13,_ship().primary,false)
+  for i in range(max_hp):
+   var col:=PINK if i<hp else Color("#373750")
+   draw_colored_polygon(PackedVector2Array([Vector2(24+i*27,68),Vector2(33+i*27,78),Vector2(24+i*27,88),Vector2(15+i*27,78)]),col)
+  _text("STAGE %d • WAVE %d/%d" % [stage,subwave,total_subwaves],Vector2(size.x*0.5,32),17,GOLD)
+  var bar_w:=minf(320.0,size.x*0.34)
+  var bar_x:=size.x*0.5-bar_w*0.5
+  draw_rect(Rect2(bar_x,50,bar_w,7),Color("#252D4A"))
+  var segment:=bar_w/float(maxi(1,total_subwaves))
+  for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,52,maxf(2.0,segment-4),3),GOLD)
+ var status_y:=size.y-136 if portrait else size.y-112
+ if shield:_text("AEGIS SHIELD",Vector2(18,status_y),13,CYAN,false);status_y+=22
+ if overdrive_time>0:_text("OVERDRIVE %.1fs" % overdrive_time,Vector2(18,status_y),13,GREEN,false);status_y+=22
+ if magnet_time>0:_text("MAGNET %.1fs" % magnet_time,Vector2(18,status_y),13,Color("#FFFF64"),false);status_y+=22
+ if slow_time>0:_text("TIME DILATION %.1fs" % slow_time,Vector2(18,status_y),13,Color("#B4C8FF"),false)
  _text("COMBO x%d" % combo,Vector2(size.x*0.5,size.y-24),16,GOLD)
- if overdrive_time>0:_text("OVERDRIVE %ds" % ceili(overdrive_time),Vector2(size.x*0.82,size.y-25),14,GREEN)
  _button(Rect2(size.x-154,12,66,42),"II" if not paused else "GO",GOLD if paused else CYAN)
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
- _button(Rect2(size.x-154,size.y-102,140,82),"DASH",CYAN)
+ _button(Rect2(size.x-154,size.y-102,140,82),"DASH" if dash_cooldown<=0 else "%.1fs" % dash_cooldown,CYAN if dash_cooldown<=0 else Color("#69718E"))
  if banner_time>0:
-  _text(banner_title,Vector2(size.x*0.5,size.y*0.20),34,CYAN)
-  _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.26),18,GOLD)
- if tutorial_active:_text("DRAG TO MOVE • TAP DASH",Vector2(size.x*0.5,size.y*0.9),18,GOLD)
+  _text(banner_title,Vector2(size.x*0.5,size.y*0.34 if portrait else size.y*0.20),34,CYAN)
+  _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.40 if portrait else size.y*0.26),18,GOLD)
+ if tutorial_active:_text("DRAG TO MOVE • DOUBLE TAP TO DASH",Vector2(size.x*0.5,size.y*0.9),18,GOLD)
 
 func _draw_menu(size: Vector2) -> void:
  _text("NEON",Vector2(size.x*0.5,size.y*0.22),70,CYAN)
