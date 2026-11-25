@@ -43,6 +43,7 @@ const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AE
 var rng := RandomNumberGenerator.new()
 var sound_bank: Node
 var viewport_size := Vector2(960,540)
+var background_gradient: GradientTexture2D
 var state := "menu"
 var achievements_return_state := "menu"
 var paused := false
@@ -133,12 +134,24 @@ func _ready() -> void:
  Engine.max_fps=target_fps
  _sync_audio()
  _create_stars()
+ _build_background_gradient()
  _reset_run()
  get_viewport().size_changed.connect(_resize)
 
 func _resize() -> void:
  viewport_size = get_viewport_rect().size
  queue_redraw()
+
+func _build_background_gradient() -> void:
+ var gradient:=Gradient.new()
+ gradient.colors=PackedColorArray([Color(0.035,0.063,0.145),Color(0.012,0.019,0.055)])
+ gradient.offsets=PackedFloat32Array([0.0,1.0])
+ background_gradient=GradientTexture2D.new()
+ background_gradient.gradient=gradient
+ background_gradient.width=1
+ background_gradient.height=256
+ background_gradient.fill_from=Vector2(0,0)
+ background_gradient.fill_to=Vector2(0,1)
 
 func _create_stars() -> void:
  stars.clear()
@@ -955,13 +968,10 @@ func _draw() -> void:
  var size:=get_viewport_rect().size
  viewport_size=size
  # Source V3.5 background gradient, subdued orbital nebulae and structural silhouettes.
- var bands:=48
- for i in range(bands):
-  var t:=float(i)/float(bands-1)
-  var col:=Color(0.035,0.063,0.145).lerp(Color(0.012,0.019,0.055),t)
-  var y0:=i*size.y/bands
-  var y1:=(i+1)*size.y/bands
-  draw_rect(Rect2(0,y0,size.x,maxf(1.0,y1-y0)),col)
+ if background_gradient!=null:
+  draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)
+ else:
+  draw_rect(Rect2(Vector2.ZERO,size),BG)
  for layer in nebula_layers:
   var p:Vector2=layer.pos
   var radius:float=layer.radius
