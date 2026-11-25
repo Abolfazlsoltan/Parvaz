@@ -20,6 +20,23 @@ const SHIPS := [
 ]
 const DIFFICULTIES := {"easy":{"hp":0.7,"speed":0.8,"reward":0.8,"label":"CADET"},"normal":{"hp":1.0,"speed":1.0,"reward":1.0,"label":"PILOT"},"hard":{"hp":1.4,"speed":1.2,"reward":1.3,"label":"ACE"},"nightmare":{"hp":2.0,"speed":1.4,"reward":1.8,"label":"NIGHTMARE"}}
 const ENEMY_TYPES := {"scout":{"hp":2,"speed":135.0,"r":18.0,"color":Color8(255,65,110),"score":25},"interceptor":{"hp":2,"speed":210.0,"r":16.0,"color":Color8(255,215,60),"score":40},"gunship":{"hp":9,"speed":85.0,"r":29.0,"color":Color8(120,160,255),"score":110},"boss":{"hp":85,"speed":75.0,"r":60.0,"color":Color8(255,85,120),"score":800}}
+const ACHIEVEMENTS := [
+ {"id":"first_blood","name":"First Blood","desc":"Destroy your first enemy"},
+ {"id":"stage_5","name":"Veteran Pilot","desc":"Reach Stage 5"},
+ {"id":"stage_10","name":"Elite Ace","desc":"Reach Stage 10"},
+ {"id":"combo_10","name":"Combo Master","desc":"Achieve 10x combo"},
+ {"id":"score_10k","name":"High Scorer","desc":"Score 10,000 points"},
+ {"id":"score_50k","name":"Legend","desc":"Score 50,000 points"},
+ {"id":"boss_slayer","name":"Boss Slayer","desc":"Defeat a Dreadnought"},
+ {"id":"all_ships","name":"Fleet Commander","desc":"Unlock all ships"},
+ {"id":"no_damage","name":"Untouchable","desc":"Complete a stage without damage"},
+ {"id":"speed_demon","name":"Speed Demon","desc":"Use dash 50 times"},
+ {"id":"survivor","name":"Survivor","desc":"Play for 30 minutes total"},
+ {"id":"killer","name":"Destroyer","desc":"Destroy 500 enemies"},
+ {"id":"collector","name":"Collector","desc":"Collect 50 powerups"},
+ {"id":"perfectionist","name":"Perfectionist","desc":"Complete 5 stages with full HP"},
+ {"id":"marathon","name":"Marathon","desc":"Play 20 runs"}
+]
 const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AEGIS SHIELD"},"overdrive":{"color":Color8(95,255,130),"symbol":"W","label":"WEAPON OVERDRIVE"},"morph":{"color":Color8(255,185,60),"symbol":"X","label":"SHIP MORPH CORE"},"repair":{"color":Color8(255,95,130),"symbol":"+","label":"HULL REPAIR"},"nuke":{"color":Color.WHITE,"symbol":"N","label":"EMP NOVA"},"magnet":{"color":Color8(255,255,100),"symbol":"M","label":"MAGNET PULSE"},"slow":{"color":Color8(180,200,255),"symbol":"T","label":"TIME DILATION"}}
 
 var rng := RandomNumberGenerator.new()
@@ -625,11 +642,15 @@ func _process(delta: float) -> void:
  queue_redraw()
 
 func _check_ship_unlocks() -> void:
+ var changed := false
  for ship in SHIPS:
-  if not unlocked_ships.has(ship.id) and stage>=ship.stage and credits>=ship.cost:
-   credits-=ship.cost
+  # Original V3.5 unlocks ships by reaching their stage; no credits are spent.
+  if not unlocked_ships.has(ship.id) and stage>=ship.stage:
    unlocked_ships.append(ship.id)
-   _popup(player,"UNLOCKED: "+ship.name,ship.primary)
+   _popup(player,"UNLOCKED: "+ship.name+"!",ship.primary)
+   changed=true
+ if changed:
+  _check_achievements()
  _save()
 
 func _equip_ship(id: String) -> void:
@@ -643,19 +664,32 @@ func _cycle_unlocked_ship() -> void:
  _equip_ship(unlocked_ships[(index+1)%unlocked_ships.size()])
 
 func _check_achievements() -> void:
- var unlocks: Array[String]=[]
- if total_kills>=1:unlocks.append("first_kill")
- if total_kills>=100:unlocks.append("kills_100")
- if bosses_defeated:unlocks.append("boss")
- if best_stage>=5 or stage>=5:unlocks.append("stage_5")
- if unlocked_ships.size()>=5:unlocks.append("all_ships")
- if dash_count>=50:unlocks.append("dash_50")
- if powerups_collected>=25:unlocks.append("power_25")
- if perfect_stages>0:unlocks.append("perfect")
- for achievement in unlocks:
-  if not achievements.has(achievement):
-   achievements.append(achievement)
-   _popup(player,"ACHIEVEMENT UNLOCKED",GOLD)
+ var checks := {
+  "first_blood":total_kills>=1,
+  "stage_5":stage>=5 or best_stage>=5,
+  "stage_10":stage>=10 or best_stage>=10,
+  "combo_10":combo>=10,
+  "score_10k":score>=10000,
+  "score_50k":score>=50000,
+  "boss_slayer":bosses_defeated,
+  "all_ships":unlocked_ships.size()>=SHIPS.size(),
+  "no_damage":perfect_stages>=1,
+  "speed_demon":dash_count>=50,
+  "survivor":total_playtime>=1800.0,
+  "killer":total_kills>=500,
+  "collector":powerups_collected>=50,
+  "perfectionist":perfect_stages>=5,
+  "marathon":total_runs>=20
+ }
+ for achievement_id in checks:
+  if checks[achievement_id] and not achievements.has(achievement_id):
+   achievements.append(achievement_id)
+   for entry in ACHIEVEMENTS:
+    if entry.id==achievement_id:
+     _popup(player,"ACHIEVEMENT: "+entry.name,GOLD)
+     credits+=500
+     break
+ _save()
 
 func _input(event: InputEvent) -> void:
  if event is InputEventKey and event.pressed and not event.echo:
@@ -725,11 +759,13 @@ func _click_ui(pos: Vector2) -> void:
     var rect:=Rect2(col*card_w+8,top+row*card_h,card_w-16,card_h-8)
     if rect.has_point(pos):
      var ship:Dictionary=SHIPS[i]
-     if unlocked_ships.has(ship.id):_equip_ship(ship.id)
-     elif stage>=ship.stage and credits>=ship.cost:
-      credits-=ship.cost
+     if unlocked_ships.has(ship.id):
+      _equip_ship(ship.id)
+     elif stage>=ship.stage:
       unlocked_ships.append(ship.id)
       _equip_ship(ship.id)
+      _check_achievements()
+      _save()
  elif state=="settings":
   if pos.y<h*0.15:state="menu"
   elif pos.y<h*0.38:
@@ -889,14 +925,14 @@ func _draw_settings(size: Vector2) -> void:
 func _draw_achievements(size: Vector2) -> void:
  _text("ACHIEVEMENTS",Vector2(size.x*0.5,size.y*0.10),36,GOLD)
  _button(Rect2(12,12,130,48),"BACK",CYAN)
- var entries:Array[Dictionary]=[{"id":"first_kill","name":"FIRST CONTACT","desc":"Destroy your first enemy"},{"id":"kills_100","name":"ACE PILOT","desc":"Destroy 100 enemies"},{"id":"boss","name":"GIANT SLAYER","desc":"Defeat a boss"},{"id":"stage_5","name":"VETERAN","desc":"Reach stage 5"},{"id":"all_ships","name":"FLEET COMMANDER","desc":"Unlock all ships"},{"id":"dash_50","name":"AFTERBURNER","desc":"Dash 50 times"},{"id":"power_25","name":"ENERGY HUNTER","desc":"Collect 25 powerups"},{"id":"perfect","name":"PERFECTION","desc":"Clear a stage without damage"}]
- for i in range(entries.size()):
-  var entry:Dictionary=entries[i]
-  var y:=size.y*0.18+i*size.y*0.095
+ for i in range(ACHIEVEMENTS.size()):
+  var entry:Dictionary=ACHIEVEMENTS[i]
+  var row_h:=size.y*0.052
+  var y:=size.y*0.17+i*row_h
   var unlocked:=achievements.has(entry.id)
-  draw_rect(Rect2(size.x*0.12,y,size.x*0.76,size.y*0.08),Color(0.08,0.1,0.18,0.95))
-  _text(entry.name,Vector2(size.x*0.35,y+24),16,GOLD if unlocked else Color("#66718A"))
-  _text(entry.desc,Vector2(size.x*0.64,y+24),12,Color.WHITE if unlocked else Color("#66718A"))
+  draw_rect(Rect2(size.x*0.08,y,size.x*0.84,row_h-3),Color(0.08,0.1,0.18,0.95))
+  _text(entry.name.to_upper(),Vector2(size.x*0.32,y+row_h*0.68),13,GOLD if unlocked else Color("#66718A"))
+  _text(entry.desc,Vector2(size.x*0.68,y+row_h*0.68),11,Color.WHITE if unlocked else Color("#66718A"))
 
 func _draw_game_over(size: Vector2) -> void:
  _draw_overlay(size,"MISSION FAILED","SCORE %d • RECORD %d" % [score,high_score],PINK)
