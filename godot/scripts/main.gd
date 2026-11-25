@@ -894,7 +894,7 @@ func _click_ui(pos: Vector2) -> void:
   else:
    var columns:=2 if w<650 else 5
    var card_w:=w/columns
-   var card_h:=w>=650?h*0.52:h*0.23
+   var card_h:=h*0.52 if w>=650 else h*0.23
    var top:=h*0.20
    for i in range(SHIPS.size()):
     var row:=i/columns
@@ -1229,7 +1229,7 @@ func _draw_hangar(size: Vector2) -> void:
  _button(Rect2(12,12,130,48),"BACK",GOLD)
  var columns:=2 if size.x<650 else 5
  var card_width:=size.x/columns
- var card_height:=size.x>=650?size.y*0.52:size.y*0.23
+ var card_height:=size.y*0.52 if size.x>=650 else size.y*0.23
  var top:=size.y*0.20
  for i in range(SHIPS.size()):
   var ship:Dictionary=SHIPS[i]
