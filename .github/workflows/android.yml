@@ -29,7 +29,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 cmdline-tools;latest cmake;3.10.2.4988404 ndk;23.2.8568313
 
       - name: Install Godot 4.4.1 and export templates
         shell: bash
@@ -69,9 +69,16 @@ jobs:
         run: godot --headless --path godot --editor --quit
 
       - name: Export Android APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
         run: |
+          set -euo pipefail
           mkdir -p godot/build
-          godot --headless --path godot --export-debug "Android" godot/build/NeonSurvivor.apk
+          mkdir -p "$GITHUB_WORKSPACE/.android"
+          cp "$HOME/.android/debug.keystore" "$GITHUB_WORKSPACE/.android/debug.keystore"
+          godot --headless --path godot --export-debug "Android" godot/build/NeonSurvivor.apk --verbose 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
           test -s godot/build/NeonSurvivor.apk
 
       - name: Upload APK
