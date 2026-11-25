@@ -10,6 +10,7 @@ const GOLD := Color("#FFD166")
 const PURPLE := Color("#B36BFF")
 const GREEN := Color("#65F59A")
 const SAVE_PATH := "user://neon_v3_save.json"
+const SOUND_BANK_SCRIPT = preload("res://scripts/sound_bank.gd")
 
 const SHIPS := [
  {"id":"viper","name":"VIPER MK-I","role":"Balanced Twin-Cannon","stage":1,"cost":0,"primary":Color8(100,240,255),"secondary":Color8(35,95,145),"bullet":Color8(140,250,255),"size":25,"hp":4,"rate":0.11,"speed":1020.0,"damage":1.0,"dash":0.95,"pattern":"twin","ability":"Fast Twin Plasma"},
@@ -40,6 +41,7 @@ const ACHIEVEMENTS := [
 const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AEGIS SHIELD"},"overdrive":{"color":Color8(95,255,130),"symbol":"W","label":"WEAPON OVERDRIVE"},"morph":{"color":Color8(255,185,60),"symbol":"X","label":"SHIP MORPH CORE"},"repair":{"color":Color8(255,95,130),"symbol":"+","label":"HULL REPAIR"},"nuke":{"color":Color.WHITE,"symbol":"N","label":"EMP NOVA"},"magnet":{"color":Color8(255,255,100),"symbol":"M","label":"MAGNET PULSE"},"slow":{"color":Color8(180,200,255),"symbol":"T","label":"TIME DILATION"}}
 
 var rng := RandomNumberGenerator.new()
+var sound_bank: Node
 var viewport_size := Vector2(960,540)
 var state := "menu"
 var paused := false
@@ -118,6 +120,8 @@ var uid := 0
 
 func _ready() -> void:
  rng.randomize()
+ sound_bank=SOUND_BANK_SCRIPT.new()
+ add_child(sound_bank)
  viewport_size = get_viewport_rect().size
  _load_save()
  _create_stars()
@@ -184,10 +188,17 @@ func _load_save() -> void:
  bosses_defeated = data.get("bosses_defeated",false) == true
 
 func _save() -> void:
+ _sync_audio()
  var data := {"hi":high_score,"best_stage":best_stage,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
  var file := FileAccess.open(SAVE_PATH,FileAccess.WRITE)
  if file != null:
   file.store_string(JSON.stringify(data))
+
+func _sync_audio() -> void:
+ if sound_bank==null:return
+ sound_bank.sfx_volume=sfx_volume
+ sound_bank.music_volume=music_volume
+ sound_bank.set_muted(muted)
 
 func _reset_run() -> void:
  var cfg := _ship()
@@ -238,6 +249,9 @@ func _start_run() -> void:
  total_runs += 1
  tutorial_active = not tutorial_done
  _start_stage(1)
+ if sound_bank!=null:
+  sound_bank.play_sfx("subwave")
+  sound_bank.start_music()
  _save()
 
 func _start_stage(number: int) -> void:
@@ -296,12 +310,14 @@ func _update_stage_director(dt: float) -> void:
  if enemies.is_empty():
   if subwave < total_subwaves:
    subwave += 1
+   if sound_bank!=null:sound_bank.play_sfx("subwave")
    wave_spawned = false
    wave_delay = 0.85
    _announce("STAGE %d" % stage,"BOSS SQUADRON!" if subwave == 4 else "SUB-WAVE %d / %d" % [subwave,total_subwaves])
   else:
    if damage_taken_stage == 0:
     perfect_stages += 1
+   if sound_bank!=null:sound_bank.play_sfx("stage_clear")
    var bonus := int(350*stage*DIFFICULTIES[difficulty].reward)
    score += bonus
    credits += int((120+stage*40)*DIFFICULTIES[difficulty].reward)
@@ -353,6 +369,7 @@ func _trigger_dash() -> void:
  dash_cooldown = _ship().dash
  invulnerable = maxf(invulnerable,0.25)
  dash_count += 1
+ if sound_bank!=null:sound_bank.play_sfx("dash")
  _shockwave(player,_ship().primary,80)
  _burst(player,_ship().primary,26,410,0.42)
  _check_achievements()
@@ -364,6 +381,7 @@ func _hurt_player() -> void:
  flash_time = 0.35
  combo = 1
  damage_taken_stage += 1
+ if sound_bank!=null:sound_bank.play_sfx("hurt")
  _shockwave(player,PINK,115)
  _burst(player,PINK,42,460,0.85,4.2)
  if hp <= 0:
@@ -379,6 +397,7 @@ func _kill_enemy(enemy: Dictionary,allow_drop: bool=true) -> void:
   return
  enemy.dead = true
  total_kills += 1
+ if sound_bank!=null:sound_bank.play_sfx("big_explode" if enemy.kind in ["gunship","boss"] else "explode")
  if enemy.kind == "boss":
   bosses_defeated = true
  var color: Color = ENEMY_TYPES[enemy.kind].color
@@ -419,6 +438,7 @@ func _add_player_bullet(pos: Vector2,direction: Vector2,pierce: int=0,homing: bo
 
 func _fire_weapons() -> void:
  var cfg := _ship()
+ var sfx: String="shoot_light"
  var aim := Vector2(cos(aim_angle),sin(aim_angle))
  var perpendicular := Vector2(-aim.y,aim.x)
  var pattern: String = cfg.pattern
@@ -429,15 +449,19 @@ func _fire_weapons() -> void:
   for angle in ([-0.22,0.0,0.22] if overdrive_time<=0 else [-0.34,-0.17,0.0,0.17,0.34]):
    _add_player_bullet(player+aim*22,aim.rotated(angle))
  elif pattern == "homing":
+  sfx="shoot_plasma"
   _add_player_bullet(player+aim*24,aim,0,false,5)
   for angle in ([-0.42,0.42] if overdrive_time<=0 else [-0.55,-0.25,0.25,0.55]):
    _add_player_bullet(player+perpendicular*(angle*32),aim.rotated(angle),0,true,4)
  elif pattern == "pierce":
+  sfx="shoot_plasma"
   for offset in ([0] if overdrive_time<=0 else [-11,11]):
    _add_player_bullet(player+aim*24+perpendicular*offset,aim,3,false,5)
  elif pattern == "heavy5":
+  sfx="shoot_heavy"
   for angle in ([-0.28,-0.14,0.0,0.14,0.28] if overdrive_time<=0 else [-0.36,-0.24,-0.12,0.0,0.12,0.24,0.36]):
    _add_player_bullet(player+aim*24,aim.rotated(angle),0,false,5)
+ if sound_bank!=null:sound_bank.play_sfx(sfx)
  fire_cooldown = cfg.rate*(0.76 if overdrive_time>0 else 1.0)
 
 func _enemy_shoot(enemy: Dictionary,angle: float,speed: float,radius: float,life: float) -> void:
@@ -610,6 +634,7 @@ func _process(delta: float) -> void:
   if distance<34.0:
    item.time=0.0
    var kind:String=item.kind
+   if sound_bank!=null:sound_bank.play_sfx("powerup")
    _popup(player+Vector2(0,-28),POWERUPS[kind].label,POWERUPS[kind].color)
    _shockwave(player,POWERUPS[kind].color,95)
    _burst(player,POWERUPS[kind].color,28,360,0.6)
@@ -661,6 +686,10 @@ func _check_ship_unlocks() -> void:
 func _equip_ship(id: String) -> void:
  if unlocked_ships.has(id):
   selected_ship=id
+  if sound_bank!=null:sound_bank.play_sfx("morph")
+  _shockwave(player,_ship().primary,120)
+  _burst(player,_ship().primary,32,360,0.65)
+  _popup(player+Vector2(0,-34),"SHIP: "+_ship().name,_ship().primary)
   _save()
 
 func _cycle_unlocked_ship() -> void:
@@ -751,6 +780,7 @@ func _pointer_up(id: int) -> void:
  if id==-2:mouse_drag=false
 
 func _click_ui(pos: Vector2) -> void:
+ if sound_bank!=null:sound_bank.play_sfx("menu_select")
  var w:=viewport_size.x
  var h:=viewport_size.y
  if state=="settings" and pos.y>=h*0.80 and pos.y<=h*0.85:
