@@ -904,27 +904,29 @@ func _click_ui(pos: Vector2) -> void:
       _check_achievements()
       _save()
  elif state=="settings":
-  if pos.y<h*0.15:state="menu"
-  elif pos.y>=h*0.20 and pos.y<h*0.28:
+  if Rect2(12,12,130,48).has_point(pos):
+   state="menu"
+  elif Rect2(w*0.18,h*0.22,w*0.64,h*0.055).has_point(pos):
    achievements_return_state="settings"
    state="achievements"
-  elif pos.y<h*0.38:
-   var choices: Array[String]=["easy","normal","hard","nightmare"]
-   difficulty=choices[clampi(int(pos.x/(w/4.0)),0,3)]
-   _save()
-  elif pos.y<h*0.55:
-   muted=not muted
-   _sync_audio()
-   if not muted and state=="play" and sound_bank!=null:sound_bank.start_music()
-   _save()
-  elif pos.y<h*0.72:
-   target_fps=60 if target_fps==45 else 45
-   Engine.max_fps=target_fps
-   _save()
-  elif pos.y<h*0.80:
-   achievements_return_state="settings"
-   state="achievements"
- elif state=="achievements":state=achievements_return_state
+  else:
+   var diff_ids:Array[String]=["easy","normal","hard","nightmare"]
+   for i in range(4):
+    var diff_rect:=Rect2(i*w/4.0+5,h*0.34,w/4.0-10,56)
+    if diff_rect.has_point(pos):
+     difficulty=diff_ids[i]
+     _save()
+     return
+   if Rect2(w*0.18,h*0.52,w*0.64,62).has_point(pos):
+    muted=not muted
+    _sync_audio()
+    if not muted and sound_bank!=null:sound_bank.start_music()
+    _save()
+   elif Rect2(w*0.18,h*0.64,w*0.64,62).has_point(pos):
+    target_fps=60 if target_fps==45 else 45
+    Engine.max_fps=target_fps
+    _save()
+   elif state=="achievements":state=achievements_return_state
  elif state=="over":
   if pos.y>h*0.74:state="menu"
   else:_start_run()
