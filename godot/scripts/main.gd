@@ -108,6 +108,8 @@ var popups: Array[Dictionary] = []
 var powerups: Array[Dictionary] = []
 var drag_id := -1
 var mouse_drag := false
+var active_slider := ""
+var slider_pointer_id := -1
 var last_touch_ms := 0
 var last_touch_pos := Vector2.ZERO
 var touch_ripple_pos := Vector2.ZERO
@@ -125,6 +127,7 @@ func _ready() -> void:
  add_child(sound_bank)
  viewport_size = get_viewport_rect().size
  _load_save()
+ Engine.max_fps=target_fps
  _sync_audio()
  _create_stars()
  _reset_run()
@@ -754,20 +757,31 @@ func _input(event: InputEvent) -> void:
   if event.pressed:_pointer_down(event.position,event.index)
   else:_pointer_up(event.index)
  elif event is InputEventScreenDrag and event.index==drag_id:
-  drag_delta+=event.position-last_drag
-  last_drag=event.position
+  if active_slider!="":_update_slider(active_slider,event.position.x)
+  else:
+   drag_delta+=event.position-last_drag
+   last_drag=event.position
  elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
   if event.pressed:_pointer_down(event.position,-2)
   else:_pointer_up(-2)
  elif event is InputEventMouseMotion and mouse_drag:
-  drag_delta+=event.position-last_drag
-  last_drag=event.position
+  if active_slider!="":_update_slider(active_slider,event.position.x)
+  else:
+   drag_delta+=event.position-last_drag
+   last_drag=event.position
 
 func _pointer_down(pos: Vector2,id: int) -> void:
  if state=="play" and tutorial_active:
   tutorial_active=false
   tutorial_done=true
   _save()
+  return
+ if state=="settings" and ((pos.y>=viewport_size.y*0.80 and pos.y<=viewport_size.y*0.85) or (pos.y>=viewport_size.y*0.90 and pos.y<=viewport_size.y*0.95)):
+  active_slider="sfx" if pos.y<viewport_size.y*0.87 else "music"
+  slider_pointer_id=id
+  drag_id=id
+  mouse_drag=id==-2
+  _update_slider(active_slider,pos.x)
   return
  if state=="play":
   touch_ripple_pos=pos
@@ -818,7 +832,18 @@ func _pointer_down(pos: Vector2,id: int) -> void:
 
 func _pointer_up(id: int) -> void:
  if id==drag_id:drag_id=-1
+ if id==slider_pointer_id:
+  active_slider=""
+  slider_pointer_id=-1
  if id==-2:mouse_drag=false
+
+func _update_slider(which: String,x: float) -> void:
+ var w:=viewport_size.x
+ var value:=clampf((x-w*0.2)/(w*0.6),0.0,1.0)
+ if which=="sfx":sfx_volume=value
+ else:music_volume=value
+ _sync_audio()
+ _save()
 
 func _click_ui(pos: Vector2) -> void:
  if sound_bank!=null:sound_bank.play_sfx("menu_select")
@@ -873,7 +898,10 @@ func _click_ui(pos: Vector2) -> void:
    _sync_audio()
    if not muted and state=="play" and sound_bank!=null:sound_bank.start_music()
    _save()
-  elif pos.y<h*0.72:target_fps=60 if target_fps==45 else 45;_save()
+  elif pos.y<h*0.72:
+   target_fps=60 if target_fps==45 else 45
+   Engine.max_fps=target_fps
+   _save()
   elif pos.y<h*0.80:
    achievements_return_state="settings"
    state="achievements"
