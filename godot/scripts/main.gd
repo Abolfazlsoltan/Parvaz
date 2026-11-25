@@ -550,6 +550,8 @@ func _process(delta: float) -> void:
  magnet_time=maxf(0.0,magnet_time-dt)
  slow_time=maxf(0.0,slow_time-dt)
  combo_time=maxf(0.0,combo_time-dt)
+ flash_time=maxf(0.0,flash_time-dt)
+ screen_shake=maxf(0.0,screen_shake-44.0*dt)
  fire_cooldown-=dt
  if fire_cooldown<=0.0:
   _fire_weapons()
@@ -1285,6 +1287,7 @@ func _draw_settings(size: Vector2) -> void:
   _text(DIFFICULTIES[ids[i]].label,Vector2(rect.position.x+rect.size.x/2,rect.position.y+35),14,Color.WHITE)
  _button(Rect2(size.x*0.18,size.y*0.52,size.x*0.64,62),"SOUND: "+("MUTED" if muted else "ON"),CYAN)
  _button(Rect2(size.x*0.18,size.y*0.64,size.x*0.64,62),"FRAME RATE: %d FPS" % target_fps,GOLD)
+ _text("TOTAL KILLS %d • PLAYTIME %dm • RUNS %d" % [total_kills,int(total_playtime/60.0),total_runs],Vector2(size.x*0.5,size.y*0.77),12,Color("#A5B4D6"))
  _text("SFX VOLUME",Vector2(size.x*0.5,size.y*0.79),16,Color.WHITE)
  draw_rect(Rect2(size.x*0.2,size.y*0.82,size.x*0.6,8),Color("#25324D"))
  draw_rect(Rect2(size.x*0.2,size.y*0.82,size.x*0.6*sfx_volume,8),CYAN)
@@ -1308,6 +1311,7 @@ func _draw_achievements(size: Vector2) -> void:
 func _draw_game_over(size: Vector2) -> void:
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
  _draw_overlay(size,"MISSION FAILED","SCORE %d • RECORD %d" % [score,high_score],PINK)
+ _text("STAGE %d • WAVE %d • CREDITS %d" % [stage,subwave,credits],Vector2(size.x*0.5,size.y*0.61),15,GOLD)
  _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,66),"RETRY",CYAN)
  _button(Rect2(size.x*0.2,size.y*0.76,size.x*0.6,60),"MAIN MENU",GOLD)
 
