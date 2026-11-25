@@ -1219,7 +1219,7 @@ func _draw_hangar(size: Vector2) -> void:
  _button(Rect2(12,12,130,48),"BACK",GOLD)
  var columns:=2 if size.x<650 else 5
  var card_width:=size.x/columns
- var card_height:=size.y*0.26
+ var card_height:=size.x>=650?size.y*0.52:size.y*0.26
  var top:=size.y*0.18
  for i in range(SHIPS.size()):
   var ship:Dictionary=SHIPS[i]
@@ -1227,13 +1227,16 @@ func _draw_hangar(size: Vector2) -> void:
   var col:=i%columns
   var rect:=Rect2(col*card_width+8,top+row*card_height,card_width-16,card_height-8)
   var unlocked:=unlocked_ships.has(ship.id)
+  var equipped:=selected_ship==ship.id
   draw_rect(rect,Color(0.06,0.09,0.17,0.96))
-  draw_rect(rect,Color(ship.primary,0.6),false,2)
+  draw_rect(rect,Color(ship.primary,0.85 if equipped else 0.6),false,3 if equipped else 2)
   _text(ship.name,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+28),16,ship.primary)
   _text(ship.role,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+52),11,Color.WHITE)
-  _draw_ship_icon(Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.48),ship.primary,int(ship.size),ship.id)
-  _text(ship.ability,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.73),10,GOLD)
-  _text("UNLOCKED" if unlocked else "%d CR • STAGE %d" % [ship.cost,ship.stage],Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.88),13,GREEN if unlocked else PINK)
+  _draw_ship_icon(Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.43),ship.primary,int(ship.size),ship.id)
+  _text("ARMOR %d • DMG %d%% • RATE %.2f" % [ship.hp,int(ship.damage*100),ship.rate],Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.67),10,Color("#A8B9D7"))
+  _text(ship.ability,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.79),10,GOLD)
+  var status: String="EQUIPPED" if equipped else ("UNLOCKED" if unlocked else "REACH STAGE %d" % ship.stage)
+  _text(status,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.91),12,GREEN if unlocked else PINK)
 
 func _draw_ship_icon(pos: Vector2,color: Color,r: int,ship_id: String="viper") -> void:
  var shape:=PackedVector2Array()
