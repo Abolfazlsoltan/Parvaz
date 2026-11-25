@@ -67,6 +67,7 @@ var damage_taken_stage := 0
 var powerups_collected := 0
 var total_kills := 0
 var total_runs := 0
+var total_playtime := 0.0
 var bosses_defeated := false
 var perfect_stages := 0
 var muted := false
@@ -157,11 +158,12 @@ func _load_save() -> void:
  if saved_achievements is Array:
   achievements.assign(saved_achievements)
  total_kills = maxi(0,int(data.get("total_kills",0)))
+ total_playtime = maxf(0.0,float(data.get("total_playtime",0.0)))
  total_runs = maxi(0,int(data.get("total_runs",0)))
  bosses_defeated = data.get("bosses_defeated",false) == true
 
 func _save() -> void:
- var data := {"hi":high_score,"best_stage":best_stage,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"bosses_defeated":bosses_defeated}
+ var data := {"hi":high_score,"best_stage":best_stage,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
  var file := FileAccess.open(SAVE_PATH,FileAccess.WRITE)
  if file != null:
   file.store_string(JSON.stringify(data))
@@ -236,24 +238,24 @@ func _spawn_subwave() -> void:
  var w := viewport_size.x
  var h := viewport_size.y
  if subwave == 1:
-  var count := mini(9,5+stage/2)
+  var count := mini(9,5+floori(float(stage)/2.0))
   for i in range(count):
    var offset := i-count/2
    var x := w*0.5+offset*minf(75.0,w*0.085)
    _create_enemy("scout",Vector2(x,-40-abs(offset)*34),"formation_hover",Vector2(x,h*0.22+abs(offset)*24),1,h*0.22,i*0.5,hp_scale,rng.randf_range(1.6,3.0))
  elif subwave == 2:
-  var per_side := mini(5,3+stage/3)
+  var per_side := mini(5,3+floori(float(stage)/3.0))
   for side in [-1,1]:
    for i in range(per_side):
     var x := -45-i*55 if side == -1 else w+45+i*55
     var y := h*(0.18+i*0.07)
     _create_enemy("interceptor",Vector2(x,y),"sine_patrol",Vector2(x,y),-side,y,i*0.85,hp_scale,rng.randf_range(1.5,2.8))
  elif subwave == 3:
-  var gunships := mini(3,1+stage/3)
+  var gunships := mini(3,1+floori(float(stage)/3.0))
   for i in range(gunships):
    var x := w*(i+1.0)/(gunships+1.0)
    _create_enemy("gunship",Vector2(x,-55),"strafe_cruiser",Vector2(x,h*0.24),1,h*0.24,i*1.4,hp_scale,1.4)
-  var escorts := mini(6,2+stage/2)
+  var escorts := mini(6,2+floori(float(stage)/2.0))
   for i in range(escorts):
    var x := w*(0.15+0.7*(float(i)/maxi(1,escorts-1)))
    _create_enemy("scout",Vector2(x,-95),"swoop_arc",Vector2(x,h*0.34),1,h*0.34,i*0.9,hp_scale,rng.randf_range(1.8,3.2))
@@ -432,6 +434,7 @@ func _process(delta: float) -> void:
   return
  elapsed+=dt
  total_playtime+=dt
+ best_stage=maxi(best_stage,stage)
  save_timer+=dt
  if save_timer>=12.0:
   save_timer=0.0
@@ -674,6 +677,11 @@ func _input(event: InputEvent) -> void:
   last_drag=event.position
 
 func _pointer_down(pos: Vector2,id: int) -> void:
+ if state=="play" and tutorial_active:
+  tutorial_active=false
+  tutorial_done=true
+  _save()
+  return
  if state=="play":
   if paused:paused=false;return
   if pos.x>viewport_size.x*0.70 and pos.y>viewport_size.y*0.65:dash_requested=true
@@ -691,6 +699,14 @@ func _pointer_up(id: int) -> void:
 func _click_ui(pos: Vector2) -> void:
  var w:=viewport_size.x
  var h:=viewport_size.y
+ if state=="settings" and pos.y>=h*0.80 and pos.y<=h*0.85:
+  sfx_volume=clampf((pos.x-w*0.2)/(w*0.6),0.0,1.0)
+  _save()
+  return
+ if state=="settings" and pos.y>=h*0.90 and pos.y<=h*0.95:
+  music_volume=clampf((pos.x-w*0.2)/(w*0.6),0.0,1.0)
+  _save()
+  return
  if state=="menu":
   if Rect2(w*0.18,h*0.50,w*0.64,h*0.10).has_point(pos):_start_run()
   elif Rect2(w*0.18,h*0.62,w*0.64,h*0.09).has_point(pos):state="hangar"
