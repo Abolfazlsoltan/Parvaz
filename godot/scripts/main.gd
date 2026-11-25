@@ -1231,13 +1231,26 @@ func _draw_hangar(size: Vector2) -> void:
   draw_rect(rect,Color(ship.primary,0.6),false,2)
   _text(ship.name,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+28),16,ship.primary)
   _text(ship.role,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+52),11,Color.WHITE)
-  _draw_ship_icon(Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.48),ship.primary,int(ship.size))
+  _draw_ship_icon(Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.48),ship.primary,int(ship.size),ship.id)
   _text(ship.ability,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.73),10,GOLD)
   _text("UNLOCKED" if unlocked else "%d CR • STAGE %d" % [ship.cost,ship.stage],Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.88),13,GREEN if unlocked else PINK)
 
-func _draw_ship_icon(pos: Vector2,color: Color,r: int) -> void:
- draw_colored_polygon(PackedVector2Array([pos+Vector2(0,-r),pos+Vector2(r*0.65,r*0.6),pos+Vector2(0,r*0.25),pos+Vector2(-r*0.65,r*0.6)]),color)
- draw_circle(pos+Vector2(0,-r*0.2),r*0.2,CYAN)
+func _draw_ship_icon(pos: Vector2,color: Color,r: int,ship_id: String="viper") -> void:
+ var shape:=PackedVector2Array()
+ match ship_id:
+  "viper":shape=PackedVector2Array([Vector2(0,-r*1.3),Vector2(r*0.25,-r*0.25),Vector2(r*1.05,r*0.4),Vector2(r*0.72,r*0.55),Vector2(0,r*0.35),Vector2(-r*0.72,r*0.55),Vector2(-r*1.05,r*0.4),Vector2(-r*0.25,-r*0.25)])
+  "interceptor":shape=PackedVector2Array([Vector2(0,-r*1.35),Vector2(r*0.22,r*0.55),Vector2(r*0.9,r*0.8),Vector2(r*0.45,r*0.25),Vector2(0,r*0.6),Vector2(-r*0.45,r*0.25),Vector2(-r*0.9,r*0.8),Vector2(-r*0.22,r*0.55)])
+  "valkyrie":shape=PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.3,-r*0.25),Vector2(r*1.1,r*0.25),Vector2(r*0.8,r*0.55),Vector2(r*0.38,r*0.35),Vector2(0,r*0.7),Vector2(-r*0.38,r*0.35),Vector2(-r*0.8,r*0.55),Vector2(-r*1.1,r*0.25),Vector2(-r*0.3,-r*0.25)])
+  "phantom":shape=PackedVector2Array([Vector2(0,-r*1.4),Vector2(r*0.18,r*0.55),Vector2(r*0.85,r*0.35),Vector2(r*0.45,r*0.72),Vector2(0,r*0.4),Vector2(-r*0.45,r*0.72),Vector2(-r*0.85,r*0.35),Vector2(-r*0.18,r*0.55)])
+  "titan":shape=PackedVector2Array([Vector2(0,-r*1.2),Vector2(r*0.4,-r*0.25),Vector2(r*1.25,r*0.5),Vector2(r*0.9,r*0.85),Vector2(r*0.35,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.35,r*0.55),Vector2(-r*0.9,r*0.85),Vector2(-r*1.25,r*0.5),Vector2(-r*0.4,-r*0.25)])
+ draw_colored_polygon(shape,color)
+ shape.append(shape[0])
+ draw_polyline(shape,Color(0.78,0.95,1.0),2.0,true)
+ draw_colored_polygon(PackedVector2Array([Vector2(0,-r*0.85),Vector2(r*0.15,-r*0.05),Vector2(0,r*0.18),Vector2(-r*0.15,-r*0.05)]),CYAN)
+ if ship_id=="titan":
+  for side in [-1.0,0.0,1.0]:draw_circle(pos+Vector2(side*r*0.4,-r*0.12),r*0.1,Color.WHITE)
+ else:
+  for side in [-1.0,1.0]:draw_circle(pos+Vector2(side*r*0.35,r*0.38),r*0.08,Color.WHITE)
 
 func _draw_settings(size: Vector2) -> void:
  _text("SYSTEM SETTINGS",Vector2(size.x*0.5,size.y*0.16),38,CYAN)
