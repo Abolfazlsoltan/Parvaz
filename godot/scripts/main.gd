@@ -208,6 +208,8 @@ func _reset_run() -> void:
  previous_player = player
  velocity = Vector2.ZERO
  aim_angle = -PI/2
+ bank = 0.0
+ muzzle_flash_time = 0.0
  hp = int(cfg.hp)
  max_hp = hp
  invulnerable = 0.0
@@ -355,6 +357,7 @@ func _shockwave(pos: Vector2,color: Color,max_radius: float=95.0) -> void:
 
 func _burst(pos: Vector2,color: Color,count: int=18,speed: float=300.0,life: float=0.6,size: float=3.2) -> void:
  count = mini(count,6)
+ size*=0.85
  for i in range(count):
   var angle := rng.randf_range(0.0,TAU)
   var spd := rng.randf_range(0.25,1.0)*speed
@@ -465,6 +468,7 @@ func _fire_weapons() -> void:
   for angle in ([-0.28,-0.14,0.0,0.14,0.28] if overdrive_time<=0 else [-0.36,-0.24,-0.12,0.0,0.12,0.24,0.36]):
    _add_player_bullet(player+aim*24,aim.rotated(angle),0,false,5)
  if sound_bank!=null:sound_bank.play_sfx(sfx)
+ muzzle_flash_time=0.045
  fire_cooldown = cfg.rate*(0.76 if overdrive_time>0 else 1.0)
 
 func _enemy_shoot(enemy: Dictionary,angle: float,speed: float,radius: float,life: float) -> void:
@@ -513,12 +517,15 @@ func _process(delta: float) -> void:
  player.y=clampf(player.y,margin+40.0,viewport_size.y-margin)
  velocity=(player-previous_player)/maxf(0.001,dt)
  var desired_angle: float=-PI/2
+ var target_bank:=clampf(velocity.x/320.0,-1.0,1.0)
+ bank+=(target_bank-bank)*minf(1.0,10.0*dt)
+ muzzle_flash_time=maxf(0.0,muzzle_flash_time-dt)
  var target:=_nearest_enemy()
  if target!=null:
   desired_angle=(target.pos-player).angle()
  aim_angle+=wrapf(desired_angle-aim_angle,-PI,PI)*minf(1.0,14.0*dt if target!=null else 8.0*dt)
  if velocity.length()>55.0 or dash_time>0:
-  trails.append({"pos":player,"time":0.14,"max":0.14,"dash":dash_time>0})
+  if trails.size()<18:trails.append({"pos":player,"time":0.14,"max":0.14,"dash":dash_time>0})
  for trail in trails:
   trail.time-=dt
  trails=trails.filter(func(item):return item.time>0)
@@ -548,6 +555,11 @@ func _process(delta: float) -> void:
  for enemy in enemies:
   enemy.rot+=effective_dt*2.2
   enemy.flash=maxf(0.0,enemy.flash-dt)
+  if enemy.kind=="gunship":enemy.hull_angle=PI/2+sin(world_time*1.1+enemy.phase)*0.22
+  elif enemy.kind=="boss" and enemy.hp<enemy.max_hp*0.5 and rng.randf()<0.35:
+   var side:=rng.randi_range(0,1)*2-1
+   var smoke_pos:Vector2=enemy.pos+Vector2(side*enemy.r*0.85,-enemy.r*0.45)
+   particles.append({"pos":smoke_pos,"vel":Vector2(rng.randf_range(-22,22),rng.randf_range(-65,-25)),"life":0.55,"max":0.55,"color":Color("#5F5569") if rng.randf()<0.7 else Color("#FF7841"),"size":rng.randf_range(3.2,5.5)})
   match enemy.mode:
    "formation_hover":
     var goal: Vector2=enemy.anchor+Vector2(sin(world_time*1.6+enemy.phase)*75.0,cos(world_time*2.1+enemy.phase)*18.0)
@@ -575,6 +587,8 @@ func _process(delta: float) -> void:
   if toward.length()>1.0:enemy.aim=toward.angle()
   enemy.shoot_cd-=effective_dt
   if enemy.shoot_cd<=0.0 and enemy.pos.y>20.0:
+   var muzzle:Vector2=enemy.pos+Vector2(cos(enemy.aim),sin(enemy.aim))*(enemy.r*0.95)
+   _burst(muzzle,ENEMY_TYPES[enemy.kind].color,3,95,0.14,2.2)
    if enemy.kind=="boss":
     enemy.shoot_cd=1.45 if enemy.hp<enemy.max_hp*0.5 else 1.65
     for angle_offset in [-0.36,-0.18,0.0,0.18,0.36]:
@@ -612,6 +626,7 @@ func _process(delta: float) -> void:
     if bullet.pierce>0:bullet.pierce-=1
     else:bullet.life=0.0
     if enemy.hp<=0.0:_kill_enemy(enemy)
+    elif sound_bank!=null:sound_bank.play_sfx("hit")
     if bullet.life<=0.0:break
  for enemy in enemies:
   if enemy.dead or player.distance_to(enemy.pos)>enemy.r+15.0:continue
@@ -924,7 +939,7 @@ func _draw_player() -> void:
  draw_set_transform(player+Vector2(18,24),aim_angle+PI/2,Vector2.ONE)
  # Ground shadow, matching the original's elevated aircraft presentation.
  draw_colored_polygon(PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.8,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.8,r*0.55)]),Color(0.01,0.02,0.06,0.38))
- draw_set_transform(player,aim_angle+PI/2,Vector2.ONE)
+ draw_set_transform(player,aim_angle+PI/2+bank*0.14,Vector2.ONE)
  # Twin/triple afterburners with animated inner hot core.
  var engines: Array[float]=[-r*0.28,r*0.28]
  if cfg.id=="titan":engines=[-r*0.38,0.0,r*0.38]
