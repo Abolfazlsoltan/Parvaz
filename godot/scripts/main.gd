@@ -204,6 +204,7 @@ func _sync_audio() -> void:
  sound_bank.sfx_volume=sfx_volume
  sound_bank.music_volume=music_volume
  sound_bank.set_muted(muted)
+ if sound_bank.music_player!=null:sound_bank.music_player.volume_db=linear_to_db(clampf(music_volume,0.0,1.0))
 
 func _reset_run() -> void:
  var cfg := _ship()
@@ -835,6 +836,7 @@ func _pointer_up(id: int) -> void:
  if id==slider_pointer_id:
   active_slider=""
   slider_pointer_id=-1
+  _save()
  if id==-2:mouse_drag=false
 
 func _update_slider(which: String,x: float) -> void:
@@ -843,7 +845,6 @@ func _update_slider(which: String,x: float) -> void:
  if which=="sfx":sfx_volume=value
  else:music_volume=value
  _sync_audio()
- _save()
 
 func _click_ui(pos: Vector2) -> void:
  if sound_bank!=null:sound_bank.play_sfx("menu_select")
