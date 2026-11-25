@@ -206,9 +206,19 @@ func _load_save() -> void:
 func _save() -> void:
  _sync_audio()
  var data := {"hi":high_score,"best_stage":best_stage,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
- var file := FileAccess.open(SAVE_PATH,FileAccess.WRITE)
- if file != null:
-  file.store_string(JSON.stringify(data))
+ # Atomic-style temp save, mirroring the Python game's write-then-replace persistence.
+ var temp_path:=SAVE_PATH+".tmp"
+ var file:=FileAccess.open(temp_path,FileAccess.WRITE)
+ if file==null:return
+ file.store_string(JSON.stringify(data))
+ file.flush()
+ file.close()
+ var temp_absolute:=ProjectSettings.globalize_path(temp_path)
+ var save_absolute:=ProjectSettings.globalize_path(SAVE_PATH)
+ var err:=DirAccess.rename_absolute(temp_absolute,save_absolute)
+ if err!=OK:
+  if FileAccess.file_exists(SAVE_PATH):DirAccess.remove_absolute(save_absolute)
+  DirAccess.rename_absolute(temp_absolute,save_absolute)
 
 func _sync_audio() -> void:
  if sound_bank==null:return
