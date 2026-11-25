@@ -1,0 +1,25 @@
+; Neon Survivor — Godot 4.4.1
+config_version=5
+
+[application]
+config/name="NEON SURVIVOR"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[display]
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/size/window_width_override=960
+window/size/window_height_override=540
+window/stretch/mode="canvas_items"
+window/handheld/orientation=0
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.012, 0.02, 0.055, 1)
+
+[input]
+dash={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":32)]}
+pause={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":80)]}
