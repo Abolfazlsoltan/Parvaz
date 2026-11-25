@@ -124,6 +124,7 @@ func _ready() -> void:
  add_child(sound_bank)
  viewport_size = get_viewport_rect().size
  _load_save()
+ _sync_audio()
  _create_stars()
  _reset_run()
  get_viewport().size_changed.connect(_resize)
@@ -391,6 +392,7 @@ func _hurt_player() -> void:
   credits += score/15
   _check_achievements()
   _save()
+  if sound_bank!=null:sound_bank.stop_music()
 
 func _kill_enemy(enemy: Dictionary,allow_drop: bool=true) -> void:
  if enemy.dead:
@@ -751,9 +753,34 @@ func _pointer_down(pos: Vector2,id: int) -> void:
   _save()
   return
  if state=="play":
-  if paused:paused=false;return
   touch_ripple_pos=pos
   touch_ripple_time=0.25
+  var w:=viewport_size.x
+  var h:=viewport_size.y
+  var mute_rect:=Rect2(w-78,12,66,42)
+  var pause_rect:=Rect2(w-154,12,66,42)
+  if mute_rect.has_point(pos):
+   muted=not muted
+   _sync_audio()
+   if not muted and not paused and sound_bank!=null:sound_bank.start_music()
+   _save()
+   return
+  if pause_rect.has_point(pos):
+   paused=not paused
+   return
+  if paused:
+   if Rect2(w*0.2,h*0.43,w*0.6,58).has_point(pos):
+    paused=false
+   elif Rect2(w*0.2,h*0.54,w*0.6,58).has_point(pos):
+    _start_run()
+   elif Rect2(w*0.2,h*0.65,w*0.6,58).has_point(pos):
+    paused=false
+    state="menu"
+    if sound_bank!=null:sound_bank.stop_music()
+   return
+  if Rect2(w-154,h-102,140,82).has_point(pos):
+   dash_requested=true
+   return
   # Faithful mobile touch behavior: second finger or a quick double tap triggers dash.
   if id!=-2:
    if drag_id!=-1 and id!=drag_id:
@@ -766,12 +793,9 @@ func _pointer_down(pos: Vector2,id: int) -> void:
    else:
     last_touch_ms=now
     last_touch_pos=pos
-  if pos.x>viewport_size.x*0.70 and pos.y>viewport_size.y*0.65:
-   dash_requested=true
-  else:
-   drag_id=id
-   mouse_drag=id==-2
-   last_drag=pos
+  drag_id=id
+  mouse_drag=id==-2
+  last_drag=pos
  else:
   _click_ui(pos)
 
@@ -822,7 +846,11 @@ func _click_ui(pos: Vector2) -> void:
    var choices: Array[String]=["easy","normal","hard","nightmare"]
    difficulty=choices[clampi(int(pos.x/(w/4.0)),0,3)]
    _save()
-  elif pos.y<h*0.55:muted=not muted;_save()
+  elif pos.y<h*0.55:
+   muted=not muted
+   _sync_audio()
+   if not muted and state=="play" and sound_bank!=null:sound_bank.start_music()
+   _save()
   elif pos.y<h*0.72:target_fps=60 if target_fps==45 else 45;_save()
  elif state=="achievements":state="menu"
  elif state=="over":
@@ -850,7 +878,11 @@ func _draw() -> void:
   "achievements":_draw_achievements(size)
   "over":_draw_game_over(size)
  if state=="play":_draw_hud(size)
- if paused:_draw_overlay(size,"PAUSED","TAP TO RESUME • PRESS P",CYAN)
+ if paused:
+  _draw_overlay(size,"PAUSED","",CYAN)
+  _button(Rect2(size.x*0.2,size.y*0.43,size.x*0.6,58),"RESUME",CYAN)
+  _button(Rect2(size.x*0.2,size.y*0.54,size.x*0.6,58),"RESTART",GOLD)
+  _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,58),"MAIN MENU",PINK)
  if tutorial_active:_draw_overlay(size,"FLIGHT TRAINING","DRAG TO MOVE • TAP DASH TO EVADE",GOLD)
  if flash_time>0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
 
@@ -1007,6 +1039,9 @@ func _draw_hud(size: Vector2) -> void:
  _text("DASH",Vector2(18,size.y-34),13,CYAN,false)
  _text("COMBO x%d" % combo,Vector2(size.x*0.5,size.y-24),16,GOLD)
  if overdrive_time>0:_text("OVERDRIVE %ds" % ceili(overdrive_time),Vector2(size.x*0.82,size.y-25),14,GREEN)
+ _button(Rect2(size.x-154,12,66,42),"II" if not paused else "GO",GOLD if paused else CYAN)
+ _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
+ _button(Rect2(size.x-154,size.y-102,140,82),"DASH",CYAN)
  if banner_time>0:
   _text(banner_title,Vector2(size.x*0.5,size.y*0.20),34,CYAN)
   _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.26),18,GOLD)
