@@ -992,7 +992,9 @@ func _draw() -> void:
   "over":_draw_game_over(size)
  if state=="play":_draw_hud(size)
  if paused:
-  _draw_overlay(size,"PAUSED","",CYAN)
+  draw_rect(Rect2(Vector2.ZERO,size),Color(0,0,0,0.72))
+  _text("PAUSED",Vector2(size.x*0.5,size.y*0.32),42,CYAN)
+  _text("MISSION PAUSED",Vector2(size.x*0.5,size.y*0.37),15,Color.WHITE)
   _button(Rect2(size.x*0.2,size.y*0.43,size.x*0.6,58),"RESUME",CYAN)
   _button(Rect2(size.x*0.2,size.y*0.54,size.x*0.6,58),"RESTART",GOLD)
   _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,58),"MAIN MENU",PINK)
