@@ -515,7 +515,7 @@ func _process(delta: float) -> void:
  if movement.length()>90.0:
   movement=movement.normalized()*90.0
  player+=movement
- var keyboard:=Vector2(Input.get_axis("ui_left","ui_right"),Input.get_axis("ui_up","ui_down"))
+ var keyboard:=Vector2(int(Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT))-int(Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)),int(Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN))-int(Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP)))
  if keyboard.length()>0:
   player+=keyboard.normalized()*480.0*dt
  if dash_requested:
@@ -649,7 +649,8 @@ func _process(delta: float) -> void:
    if shield:
     shield=false
     invulnerable=0.7
-    _shockwave(player,CYAN,85)
+    if sound_bank!=null:sound_bank.play_sfx("powerup")
+    _shockwave(player,CYAN,85
     _kill_enemy(enemy)
    else:
     _hurt_player()
@@ -698,6 +699,7 @@ func _process(delta: float) -> void:
  enemy_bullets=enemy_bullets.filter(func(item):return item.life>0 and item.pos.x>-70 and item.pos.x<viewport_size.x+70 and item.pos.y>-70 and item.pos.y<viewport_size.y+70)
  enemies=enemies.filter(func(item):return not item.dead)
  particles=particles.filter(func(item):return item.life>0)
+ if particles.size()>80:particles=particles.slice(particles.size()-80)
  shockwaves=shockwaves.filter(func(item):return item.time>0)
  popups=popups.filter(func(item):return item.time>0)
  powerups=powerups.filter(func(item):return item.time>0 and item.pos.y<viewport_size.y+50)
@@ -717,7 +719,13 @@ func _check_ship_unlocks() -> void:
 
 func _equip_ship(id: String) -> void:
  if unlocked_ships.has(id):
+  var old_cfg:=_ship()
   selected_ship=id
+  if state=="play":
+   var new_cfg:=_ship()
+   var hp_diff:=int(new_cfg.hp)-int(old_cfg.hp)
+   max_hp=int(new_cfg.hp)
+   hp=maxi(1,mini(max_hp,hp+maxi(0,hp_diff)))
   if sound_bank!=null:sound_bank.play_sfx("morph")
   _shockwave(player,_ship().primary,120)
   _burst(player,_ship().primary,32,360,0.65)
@@ -960,7 +968,10 @@ func _draw() -> void:
  if touch_ripple_time>0.0:
   var progress:=1.0-touch_ripple_time/0.25
   draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
- if state=="play" or state=="over":_draw_game()
+ if state=="play" or state=="over":
+  if screen_shake>0.1:draw_set_transform(Vector2(rng.randf_range(-screen_shake,screen_shake),rng.randf_range(-screen_shake,screen_shake)),0,Vector2.ONE)
+  _draw_game()
+  draw_set_transform(Vector2.ZERO)
  match state:
   "menu":_draw_menu(size)
   "hangar":_draw_hangar(size)
