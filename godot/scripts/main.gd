@@ -877,14 +877,14 @@ func _click_ui(pos: Vector2) -> void:
   _save()
   return
  if state=="menu":
-  if Rect2(w*0.18,h*0.50,w*0.64,h*0.10).has_point(pos):_start_run()
-  elif Rect2(w*0.18,h*0.62,w*0.64,h*0.09).has_point(pos):state="hangar"
-  elif Rect2(w*0.18,h*0.73,w*0.64,h*0.09).has_point(pos):state="settings"
-  elif Rect2(w*0.18,h*0.84,w*0.64,h*0.09).has_point(pos):
+  if Rect2(w*0.18,h*0.53,w*0.64,h*0.09).has_point(pos):_start_run()
+  elif Rect2(w*0.18,h*0.635,w*0.64,h*0.085).has_point(pos):state="hangar"
+  elif Rect2(w*0.18,h*0.735,w*0.64,h*0.085).has_point(pos):state="settings"
+  elif Rect2(w*0.18,h*0.835,w*0.64,h*0.085).has_point(pos):
    achievements_return_state="menu"
    state="achievements"
  elif state=="hangar":
-  if pos.y<h*0.12:state="menu"
+  if Rect2(12,12,130,48).has_point(pos):state="menu"
   else:
    var columns:=2 if w<650 else 5
    var card_w:=w/columns
