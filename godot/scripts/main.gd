@@ -844,36 +844,128 @@ func _draw_game() -> void:
 func _draw_player() -> void:
  var cfg:=_ship()
  var r:=float(cfg.size)
+ var primary:Color=cfg.primary
+ var secondary:Color=cfg.secondary
+ var t:=Time.get_ticks_msec()/1000.0
+ var thrust:=clampf(velocity.length()/480.0,0.25,1.0)
+ var flicker:=1.0+0.22*sin(t*26.0)
+ draw_set_transform(player+Vector2(18,24),aim_angle+PI/2,Vector2.ONE)
+ # Ground shadow, matching the original's elevated aircraft presentation.
+ draw_colored_polygon(PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.8,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.8,r*0.55)]),Color(0.01,0.02,0.06,0.38))
  draw_set_transform(player,aim_angle+PI/2,Vector2.ONE)
- draw_colored_polygon(PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.72,r*0.55),Vector2(r*0.36,r*0.72),Vector2(0,r*0.42),Vector2(-r*0.36,r*0.72),Vector2(-r*0.72,r*0.55)]),cfg.secondary)
- draw_colored_polygon(PackedVector2Array([Vector2(0,-r),Vector2(r*0.34,r*0.42),Vector2(0,r*0.2),Vector2(-r*0.34,r*0.42)]),cfg.primary)
- draw_circle(Vector2(0,-r*0.25),r*0.2,CYAN)
+ # Twin/triple afterburners with animated inner hot core.
+ var engines: Array[float]=[-r*0.28,r*0.28]
+ if cfg.id=="titan":engines=[-r*0.38,0.0,r*0.38]
+ for side in engines:
+  var flame_len:=r*1.15*flicker*thrust*(1.25 if dash_time>0 else 1.0)
+  var flame:=PackedVector2Array([Vector2(-r*0.72,side-r*0.14),Vector2(-r*0.72-flame_len,side),Vector2(-r*0.72,side+r*0.14)])
+  draw_colored_polygon(flame,primary)
+  draw_colored_polygon(PackedVector2Array([Vector2(-r*0.74,side-r*0.07),Vector2(-r*0.74-flame_len*0.52,side),Vector2(-r*0.74,side+r*0.07)]),Color.WHITE)
+ # Main airframe silhouette and swept wings.
+ var hull:=PackedVector2Array([Vector2(0,-r*1.35),Vector2(r*0.24,-r*0.48),Vector2(r*1.05,r*0.22),Vector2(r*0.86,r*0.52),Vector2(r*0.30,r*0.35),Vector2(0,r*0.78),Vector2(-r*0.30,r*0.35),Vector2(-r*0.86,r*0.52),Vector2(-r*1.05,r*0.22),Vector2(-r*0.24,-r*0.48)])
+ draw_colored_polygon(hull,secondary)
+ var hull_outline:=hull.duplicate()
+ hull_outline.append(hull_outline[0])
+ draw_polyline(hull_outline,primary,2.2,true)
+ # Distinct hull details by ship class.
+ match cfg.id:
+  "viper":
+   draw_colored_polygon(PackedVector2Array([Vector2(-r*0.2,-r*0.42),Vector2(-r*0.13,r*0.48),Vector2(0,r*0.65),Vector2(r*0.13,r*0.48),Vector2(r*0.2,-r*0.42)]),primary)
+   for side in [-1.0,1.0]:
+    draw_line(Vector2(side*r*0.62,r*0.25),Vector2(side*r*0.35,r*0.02),Color(0.65,0.95,1),2)
+  "interceptor":
+   draw_colored_polygon(PackedVector2Array([Vector2(0,-r*1.12),Vector2(r*0.14,r*0.45),Vector2(0,r*0.63),Vector2(-r*0.14,r*0.45)]),primary)
+   draw_line(Vector2(-r*0.8,r*0.38),Vector2(-r*0.25,r*0.1),Color.WHITE,2)
+   draw_line(Vector2(r*0.8,r*0.38),Vector2(r*0.25,r*0.1),Color.WHITE,2)
+  "valkyrie":
+   for side in [-1.0,1.0]:
+    draw_circle(Vector2(side*r*0.78,r*0.28),r*0.16,secondary)
+    draw_arc(Vector2(side*r*0.78,r*0.28),r*0.16,0,TAU,20,primary,2)
+   draw_line(Vector2(0,-r*0.55),Vector2(0,r*0.48),Color(0.7,1,0.8),2)
+  "phantom":
+   draw_line(Vector2(0,-r*0.95),Vector2(0,r*0.62),Color(0.75,0.85,1),3)
+   draw_line(Vector2(-r*0.7,r*0.32),Vector2(r*0.7,r*0.32),primary,2)
+  "titan":
+   for side in [-1.0,0.0,1.0]:
+    draw_circle(Vector2(side*r*0.42,-r*0.15),r*0.13,Color(0.2,0.05,0.12))
+    draw_circle(Vector2(side*r*0.42,-r*0.15),r*0.08,primary)
+ # Canopy, nose emitter and navigation lights.
+ draw_colored_polygon(PackedVector2Array([Vector2(0,-r*0.78),Vector2(r*0.17,-r*0.18),Vector2(0,r*0.05),Vector2(-r*0.17,-r*0.18)]),Color(0.72,0.98,1))
+ draw_line(Vector2(0,-r*0.72),Vector2(0,-r*0.25),Color.WHITE,1)
+ var blink:=1.0 if int(t*1000)%700<180 else 0.35
+ draw_circle(Vector2(-r*0.35,-r*1.05),maxf(2.0,r*0.10),Color(1.0,0.22,0.3,blink))
+ draw_circle(Vector2(r*0.35,-r*1.05),maxf(2.0,r*0.10),Color(0.25,1.0,0.55,blink))
  draw_set_transform(Vector2.ZERO)
- if shield:draw_arc(player,r+16,0,TAU,40,GREEN,2.5)
+ if shield:
+  var shield_r:=r*1.65+2.5*sin(t*9.0)
+  draw_arc(player,shield_r,0,TAU,48,CYAN,2)
+  draw_arc(player,shield_r+4,0,TAU,48,Color(0.14,0.51,0.71,0.6),1)
  if invulnerable>0 and int(invulnerable*12)%2==0:draw_arc(player,r+7,0,TAU,32,Color(1,1,1,0.65),2)
- if dash_time>0:draw_line(player,player-dash_direction*45,Color(cfg.primary,0.6),r*0.7)
+ if overdrive_time>0:
+  draw_arc(player,r+11,0,TAU,40,Color(primary,0.45+0.2*sin(t*8)),2)
+ if dash_time>0:draw_line(player,player-dash_direction*45,Color(primary,0.6),r*0.7)
 
 func _draw_enemy(enemy: Dictionary) -> void:
- var col:Color=ENEMY_TYPES[enemy.kind].color
+ var spec:Dictionary=ENEMY_TYPES[enemy.kind]
+ var col:Color=Color.WHITE if enemy.flash>0 else spec.color
  var r:float=enemy.r
- draw_set_transform(enemy.pos,enemy.aim+PI/2,Vector2.ONE)
- if enemy.kind=="boss":
-  var points:=PackedVector2Array([Vector2(0,-r*1.5),Vector2(r*0.45,-r*0.45),Vector2(r*1.25,r*0.6),Vector2(r*0.7,r*0.9),Vector2(0,r*0.5),Vector2(-r*0.7,r*0.9),Vector2(-r*1.25,r*0.6),Vector2(-r*0.45,-r*0.45)])
-  draw_colored_polygon(points,Color(0.2,0.07,0.18))
-  points.append(points[0])
-  draw_polyline(points,col,3)
- elif enemy.kind=="gunship":
-  draw_colored_polygon(PackedVector2Array([Vector2(0,-r),Vector2(r*0.45,-r*0.4),Vector2(r*1.2,r*0.3),Vector2(r*0.8,r*0.8),Vector2(-r*0.8,r*0.8),Vector2(-r*1.2,r*0.3),Vector2(-r*0.45,-r*0.4)]),Color(0.12,0.16,0.32))
-  draw_arc(Vector2.ZERO,r,0,TAU,32,col,2)
+ var t:=Time.get_ticks_msec()/1000.0
+ var hp_frac:=clampf(enemy.hp/float(maxi(1,enemy.max_hp)),0.0,1.0)
+ var critical:=enemy.kind=="boss" and hp_frac<0.5
+ if critical and enemy.flash<=0:col=Color(1.0,0.22,0.30)
+ var hull_angle:float=enemy.aim
+ if enemy.kind=="gunship":hull_angle=enemy.get("hull_angle",PI/2)
+ draw_set_transform(enemy.pos+Vector2(15,20),hull_angle+PI/2,Vector2.ONE)
+ draw_colored_polygon(PackedVector2Array([Vector2(0,-r),Vector2(r*0.65,r*0.45),Vector2(0,r*0.65),Vector2(-r*0.65,r*0.45)]),Color(0.01,0.02,0.07,0.42))
+ draw_set_transform(enemy.pos,hull_angle+PI/2,Vector2.ONE)
+ var flame_len:=r*(0.65+0.22*sin(t*18.0+enemy.uid))
+ if enemy.kind=="interceptor":
+  for side in [-1.0,1.0]:
+   draw_colored_polygon(PackedVector2Array([Vector2(-r*0.62,side*r*0.22-r*0.10),Vector2(-r*0.62-flame_len*1.45,side*r*0.22),Vector2(-r*0.62,side*r*0.22+r*0.10)]),col)
+ elif enemy.kind=="boss":
+  for side in [-1.0,1.0]:
+   draw_colored_polygon(PackedVector2Array([Vector2(-r*0.82,side*r*0.86-r*0.14),Vector2(-r*0.82-flame_len*1.15,side*r*0.86),Vector2(-r*0.82,side*r*0.86+r*0.14)]),col)
  else:
-  draw_colored_polygon(PackedVector2Array([Vector2(0,-r),Vector2(r*0.9,r*0.7),Vector2(0,r*0.35),Vector2(-r*0.9,r*0.7)]),Color(0.25,0.08,0.16))
-  draw_arc(Vector2.ZERO,r,0,TAU,24,col,2)
- draw_circle(Vector2(0,-r*0.2),r*0.22,col)
+  draw_colored_polygon(PackedVector2Array([Vector2(-r*0.72,-r*0.18),Vector2(-r*0.72-flame_len,0),Vector2(-r*0.72,r*0.18)]),col)
+ if enemy.kind=="scout":
+  var shape:=PackedVector2Array([Vector2(0,-r),Vector2(r*0.82,-r*0.15),Vector2(r*0.65,r*0.68),Vector2(0,r*0.42),Vector2(-r*0.65,r*0.68),Vector2(-r*0.82,-r*0.15)])
+  draw_colored_polygon(shape,Color(0.22,0.07,0.16))
+  shape.append(shape[0]);draw_polyline(shape,col,2.5,true)
+  draw_circle(Vector2(r*0.24,0),r*0.20,Color(1.0,0.82+0.15*sin(t*11+enemy.uid),0.88))
+ elif enemy.kind=="interceptor":
+  var shape2:=PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.3,-r*0.15),Vector2(r*1.0,r*0.55),Vector2(r*0.5,r*0.35),Vector2(0,r*0.78),Vector2(-r*0.5,r*0.35),Vector2(-r*1.0,r*0.55),Vector2(-r*0.3,-r*0.15)])
+  draw_colored_polygon(shape2,Color(0.22,0.16,0.05));shape2.append(shape2[0]);draw_polyline(shape2,col,2.5,true)
+  draw_circle(Vector2(0,-r*0.18),r*0.17,Color(1.0,0.9,0.65))
+ elif enemy.kind=="gunship":
+  var shape3:=PackedVector2Array([Vector2(0,-r),Vector2(r*0.45,-r*0.4),Vector2(r*1.2,r*0.3),Vector2(r*0.8,r*0.8),Vector2(-r*0.8,r*0.8),Vector2(-r*1.2,r*0.3),Vector2(-r*0.45,-r*0.4)])
+  draw_colored_polygon(shape3,Color(0.12,0.16,0.32));shape3.append(shape3[0]);draw_polyline(shape3,col,3,true)
+  for side in [-1.0,1.0]:
+   var mount:=Vector2(r*0.10,side*r*0.58)
+   draw_circle(mount,r*0.22,Color(0.11,0.06,0.18))
+   draw_arc(mount,r*0.22,0,TAU,24,col,2)
+   var track:Vector2=(player-enemy.pos).normalized()
+   draw_line(mount,mount+track*r*0.52,Color.WHITE,3)
+ elif enemy.kind=="boss":
+  var shape4:=PackedVector2Array([Vector2(0,-r*1.5),Vector2(r*0.45,-r*0.45),Vector2(r*1.25,r*0.6),Vector2(r*0.7,r*0.9),Vector2(0,r*0.5),Vector2(-r*0.7,r*0.9),Vector2(-r*1.25,r*0.6),Vector2(-r*0.45,-r*0.45)])
+  draw_colored_polygon(shape4,Color(0.18,0.06,0.16));shape4.append(shape4[0]);draw_polyline(shape4,col,4,true)
+  var rot:=enemy.rot*(1.8 if critical else 1.0)
+  var core:=PackedVector2Array()
+  for i in range(6):core.append(Vector2(cos(rot+i*TAU/6),sin(rot+i*TAU/6))*r*0.38)
+  core.append(core[0]);draw_polyline(core,Color(1.0,0.43,0.43) if critical else Color(1.0,0.76,0.92),2.5,true)
+  draw_circle(Vector2.ZERO,r*0.13,Color.WHITE)
+  var track2:Vector2=(player-enemy.pos).normalized()
+  for side in [-1.0,1.0]:
+   var mount2:=Vector2(r*0.08,side*r*0.56)
+   draw_arc(mount2,r*0.14,0,TAU,20,col,2)
+   draw_line(mount2,mount2+track2*r*0.36,Color.WHITE,3)
  draw_set_transform(Vector2.ZERO)
- var bar_width:=r*2
- draw_rect(Rect2(enemy.pos.x-bar_width/2,enemy.pos.y-r-12,bar_width,4),Color(0.18,0.2,0.28))
- draw_rect(Rect2(enemy.pos.x-bar_width/2,enemy.pos.y-r-12,bar_width*clampf(enemy.hp/enemy.max_hp,0,1),4),GREEN if enemy.hp/enemy.max_hp>0.5 else PINK)
-
+ # Boss health ring, gunship health bar only after damage.
+ if enemy.kind=="boss":
+  draw_arc(enemy.pos,r+18,-PI/2,-PI/2+TAU*maxf(0.03,hp_frac),64,col,4)
+ elif enemy.kind=="gunship" and enemy.hp<enemy.max_hp:
+  var bw:=r*1.6
+  draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw,4),Color(0.16,0.08,0.22))
+  draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw*hp_frac,4),col)
 func _draw_hud(size: Vector2) -> void:
  _text("SCORE  %d" % score,Vector2(size.x*0.16,34),20,Color.WHITE)
  _text("BEST  %d" % high_score,Vector2(size.x*0.16,56),13,Color("#A5B4D6"))
