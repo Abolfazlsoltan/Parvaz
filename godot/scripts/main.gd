@@ -293,7 +293,7 @@ func _spawn_subwave() -> void:
  if subwave == 1:
   var count := mini(9,5+floori(float(stage)/2.0))
   for i in range(count):
-   var offset := i-count/2
+   var offset := i-floori(float(count)/2.0)
    var x := w*0.5+offset*minf(75.0,w*0.085)
    _create_enemy("scout",Vector2(x,-40-abs(offset)*34),"formation_hover",Vector2(x,h*0.22+abs(offset)*24),1,h*0.22,i*0.5,hp_scale,rng.randf_range(1.6,3.0))
  elif subwave == 2:
@@ -407,7 +407,7 @@ func _hurt_player() -> void:
   state = "over"
   tutorial_active = false
   high_score = maxi(high_score,score)
-  credits += score/15
+  credits += floori(float(score)/15.0)
   _check_achievements()
   _save()
   if sound_bank!=null:sound_bank.stop_music()
@@ -429,7 +429,7 @@ func _kill_enemy(enemy: Dictionary,allow_drop: bool=true) -> void:
  combo_time = 2.4
  var points := int(enemy.score*combo*DIFFICULTIES[difficulty].reward)
  score += points
- credits += maxi(2,points/25)
+ credits += maxi(2,floori(float(points)/25.0))
  _popup(enemy.pos,"+%d" % points,color)
  if allow_drop and rng.randf() < (0.45 if enemy.kind=="gunship" else 0.13):
   _spawn_powerup(enemy.pos)
@@ -897,7 +897,7 @@ func _click_ui(pos: Vector2) -> void:
    var card_h:=h*0.52 if w>=650 else h*0.23
    var top:=h*0.20
    for i in range(SHIPS.size()):
-    var row:=i/columns
+    var row:=floori(float(i)/float(columns))
     var col:=i%columns
     var rect:=Rect2(col*card_w+8,top+row*card_h,card_w-16,card_h-8)
     if rect.has_point(pos):
@@ -1233,7 +1233,7 @@ func _draw_hangar(size: Vector2) -> void:
  var top:=size.y*0.20
  for i in range(SHIPS.size()):
   var ship:Dictionary=SHIPS[i]
-  var row:=i/columns
+  var row:=floori(float(i)/float(columns))
   var col:=i%columns
   var rect:=Rect2(col*card_width+8,top+row*card_height,card_width-16,card_height-8)
   var unlocked:=unlocked_ships.has(ship.id)
