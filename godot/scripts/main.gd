@@ -105,6 +105,10 @@ var popups: Array[Dictionary] = []
 var powerups: Array[Dictionary] = []
 var drag_id := -1
 var mouse_drag := false
+var last_touch_ms := 0
+var last_touch_pos := Vector2.ZERO
+var touch_ripple_pos := Vector2.ZERO
+var touch_ripple_time := 0.0
 var last_drag := Vector2.ZERO
 var drag_delta := Vector2.ZERO
 var dash_requested := false
@@ -442,6 +446,7 @@ func _enemy_shoot(enemy: Dictionary,angle: float,speed: float,radius: float,life
 
 func _process(delta: float) -> void:
  var dt := minf(delta,0.033)
+ touch_ripple_time=maxf(0.0,touch_ripple_time-dt)
  for star in stars:
   star.pos.y = fposmod(star.pos.y+22.0*dt,viewport_size.y)
  if state!="play" or paused or tutorial_active:
@@ -718,7 +723,22 @@ func _pointer_down(pos: Vector2,id: int) -> void:
   return
  if state=="play":
   if paused:paused=false;return
-  if pos.x>viewport_size.x*0.70 and pos.y>viewport_size.y*0.65:dash_requested=true
+  touch_ripple_pos=pos
+  touch_ripple_time=0.25
+  # Faithful mobile touch behavior: second finger or a quick double tap triggers dash.
+  if id!=-2:
+   if drag_id!=-1 and id!=drag_id:
+    dash_requested=true
+    return
+   var now:=Time.get_ticks_msec()
+   if now-last_touch_ms<320 and pos.distance_to(last_touch_pos)<120.0:
+    dash_requested=true
+    last_touch_ms=0
+   else:
+    last_touch_ms=now
+    last_touch_pos=pos
+  if pos.x>viewport_size.x*0.70 and pos.y>viewport_size.y*0.65:
+   dash_requested=true
   else:
    drag_id=id
    mouse_drag=id==-2
@@ -789,6 +809,9 @@ func _draw() -> void:
  for i in range(8):
   draw_line(Vector2(0,size.y*i/8.0),Vector2(size.x,size.y*i/8.0),GRID,1)
  for star in stars:draw_circle(star.pos,1.5,Color(0.5,0.75,1,0.35))
+ if touch_ripple_time>0.0:
+  var progress:=1.0-touch_ripple_time/0.25
+  draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
  if state=="play" or state=="over":_draw_game()
  match state:
   "menu":_draw_menu(size)
