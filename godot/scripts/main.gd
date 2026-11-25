@@ -868,6 +868,12 @@ func _click_ui(pos: Vector2) -> void:
  if sound_bank!=null:sound_bank.play_sfx("menu_select")
  var w:=viewport_size.x
  var h:=viewport_size.y
+ if state!="play" and Rect2(w-78,12,66,42).has_point(pos):
+  muted=not muted
+  _sync_audio()
+  if not muted and sound_bank!=null:sound_bank.start_music()
+  _save()
+  return
  if state=="settings" and pos.y>=h*0.80 and pos.y<=h*0.85:
   sfx_volume=clampf((pos.x-w*0.2)/(w*0.6),0.0,1.0)
   _save()
@@ -1217,6 +1223,7 @@ func _draw_menu(size: Vector2) -> void:
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
 
 func _draw_hangar(size: Vector2) -> void:
+ _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
  _text("FLEET HANGAR",Vector2(size.x*0.5,size.y*0.10),36,CYAN)
  _text("CREDITS %d • TAP TO EQUIP OR UNLOCK" % credits,Vector2(size.x*0.5,size.y*0.16),12,GOLD)
  _button(Rect2(12,12,130,48),"BACK",GOLD)
@@ -1259,6 +1266,7 @@ func _draw_ship_icon(pos: Vector2,color: Color,r: int,ship_id: String="viper") -
   for side in [-1.0,1.0]:draw_circle(pos+Vector2(side*r*0.35,r*0.38),r*0.08,Color.WHITE)
 
 func _draw_settings(size: Vector2) -> void:
+ _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
  _text("SYSTEM SETTINGS",Vector2(size.x*0.5,size.y*0.16),38,CYAN)
  _button(Rect2(12,12,130,48),"BACK",GOLD)
  _text("DIFFICULTY",Vector2(size.x*0.5,size.y*0.30),22,Color.WHITE)
@@ -1280,6 +1288,7 @@ func _draw_settings(size: Vector2) -> void:
  draw_rect(Rect2(size.x*0.2,size.y*0.92,size.x*0.6*music_volume,8),PURPLE)
 
 func _draw_achievements(size: Vector2) -> void:
+ _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
  _text("ACHIEVEMENTS",Vector2(size.x*0.5,size.y*0.10),36,GOLD)
  _button(Rect2(12,12,130,48),"BACK",CYAN)
  for i in range(ACHIEVEMENTS.size()):
@@ -1292,6 +1301,7 @@ func _draw_achievements(size: Vector2) -> void:
   _text(entry.desc,Vector2(size.x*0.68,y+row_h*0.68),11,Color.WHITE if unlocked else Color("#66718A"))
 
 func _draw_game_over(size: Vector2) -> void:
+ _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
  _draw_overlay(size,"MISSION FAILED","SCORE %d • RECORD %d" % [score,high_score],PINK)
  _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,66),"RETRY",CYAN)
  _button(Rect2(size.x*0.2,size.y*0.76,size.x*0.6,60),"MAIN MENU",GOLD)
