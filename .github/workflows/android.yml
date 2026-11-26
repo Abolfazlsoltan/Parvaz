@@ -50,12 +50,101 @@ jobs:
           fi
           godot --version
 
-      - name: Configure Android export
+      - name: Decode icons and release keystore
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.config/godot" "$HOME/.android"
-          keytool -genkeypair -noprompt -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          pip install --quiet pillow
+          python3 << 'PY'
+          import base64
+          from pathlib import Path
+          from PIL import Image
+
+          def decode(b64_path: Path, out_path: Path):
+              data = base64.b64decode(b64_path.read_text().strip())
+              out_path.parent.mkdir(parents=True, exist_ok=True)
+              out_path.write_bytes(data)
+              print(f"decoded {b64_path.name} -> {out_path} ({len(data)} bytes)")
+
+          root = Path("godot")
+          decode(root / "android/neonsurvivor-release.keystore.b64", root / "android/neonsurvivor-release.keystore")
+
+          part1 = root / "icons/source.jpg.b64.part1"
+          part2 = root / "icons/source.jpg.b64.part2"
+          src_b64 = root / "icons/source.jpg.b64"
+          if part1.exists() and part2.exists():
+              src_b64.write_text(part1.read_text().strip() + part2.read_text().strip())
+          if not src_b64.exists():
+              raise SystemExit("missing godot/icons/source.jpg.b64 (or part1/part2)")
+          jpg_path = root / "icons/source.jpg"
+          decode(src_b64, jpg_path)
+          src = Image.open(jpg_path).convert("RGBA")
+          w, h = src.size
+          side = min(w, h)
+          left = (w - side) // 2
+          top = (h - side) // 2
+          crop = src.crop((left, top, left + side, top + side))
+
+          def save_resized(size, path):
+              im = crop.resize((size, size), Image.Resampling.LANCZOS)
+              path.parent.mkdir(parents=True, exist_ok=True)
+              im.save(path, "PNG")
+              print(f"icon {path} {size}x{size}")
+
+          save_resized(512, root / "icon.png")
+          save_resized(192, root / "icons/icon_192.png")
+          save_resized(432, root / "icons/icon_adaptive_fg.png")
+          Image.new("RGBA", (432, 432), (90, 170, 230, 255)).save(root / "icons/icon_adaptive_bg.png", "PNG")
+          PY
+          test -s godot/icon.png
+          test -s godot/icons/icon_192.png
+          test -s godot/icons/icon_adaptive_fg.png
+          test -s godot/android/neonsurvivor-release.keystore
+          echo "Icons and keystore ready."
+
+      - name: Configure Android export (debug + release keystores)
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RELEASE_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export RELEASE_KEYSTORE_PASS="${RELEASE_KEYSTORE_PASS:-NeonSurvivor2026!}"
+          export RELEASE_KEY_ALIAS="${RELEASE_KEY_ALIAS:-neonsurvivor}"
+          export RELEASE_KEY_PASS="${RELEASE_KEY_PASS:-NeonSurvivor2026!}"
+          mkdir -p "$HOME/.config/godot" "$HOME/.android" "$GITHUB_WORKSPACE/.android"
+          keytool -genkeypair -noprompt \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          cp "$HOME/.android/debug.keystore" "$GITHUB_WORKSPACE/.android/debug.keystore"
+          KS_PATH="$GITHUB_WORKSPACE/godot/android/neonsurvivor-release.keystore"
+          test -s "$KS_PATH"
+          python3 << PY
+          from pathlib import Path
+          import os
+          p = Path("godot/export_presets.cfg")
+          text = p.read_text()
+          ks = os.environ["GITHUB_WORKSPACE"] + "/godot/android/neonsurvivor-release.keystore"
+          passwd = os.environ["RELEASE_KEYSTORE_PASS"]
+          alias = os.environ["RELEASE_KEY_ALIAS"]
+          lines = []
+          for line in text.splitlines():
+              if line.startswith("keystore/release="):
+                  lines.append(f'keystore/release="{ks}"')
+              elif line.startswith("keystore/release_user="):
+                  lines.append(f'keystore/release_user="{alias}"')
+              elif line.startswith("keystore/release_password="):
+                  lines.append(f'keystore/release_password="{passwd}"')
+              elif line.startswith("keystore/debug="):
+                  lines.append(f'keystore/debug="{os.environ["HOME"]}/.android/debug.keystore"')
+              else:
+                  lines.append(line)
+          p.write_text("\n".join(lines) + "\n")
+          print("export_presets.cfg keystore paths updated")
+          PY
           cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
 
@@ -65,9 +154,11 @@ jobs:
           export/android/debug_keystore = "$HOME/.android/debug.keystore"
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
+          export/android/keystore = "$KS_PATH"
+          export/android/keystore_user = "$RELEASE_KEY_ALIAS"
+          export/android/keystore_pass = "$RELEASE_KEYSTORE_PASS"
           EOF
-          echo "Generated Godot EditorSettings:"
-          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          echo "Editor settings configured for release signing."
 
       - name: Verify Android toolchain
         shell: bash
@@ -77,15 +168,16 @@ jobs:
           test -d "$ANDROID_HOME/platforms/android-34"
           test -d "$ANDROID_HOME/build-tools/34.0.0"
           test -d "$ANDROID_HOME/ndk/23.2.8568313"
-          test -d "$ANDROID_HOME/cmake/3.10.2.4988404"
           test -x "$JAVA_HOME/bin/java"
           test -s "$HOME/.android/debug.keystore"
-          echo "Android SDK, NDK, CMake, Java and debug keystore are present."
+          test -s godot/android/neonsurvivor-release.keystore
+          test -s godot/icon.png
+          echo "Toolchain + icons + release keystore OK."
 
       - name: Validate Godot project
-        run: godot --headless --path godot --editor --quit
+        run: godot --headless --path godot --editor --quit-after 2 || godot --headless --path godot --editor --quit
 
-      - name: Export Android APK
+      - name: Export signed release APK
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.android/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -93,10 +185,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p godot/build
-          mkdir -p "$GITHUB_WORKSPACE/.android"
-          cp "$HOME/.android/debug.keystore" "$GITHUB_WORKSPACE/.android/debug.keystore"
-          godot --headless --path godot --export-debug "Android" build/NeonSurvivor.apk --verbose 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
+          godot --headless --path godot --export-release "Android" build/NeonSurvivor.apk --verbose 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
           test -s godot/build/NeonSurvivor.apk
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs godot/build/NeonSurvivor.apk || true
+          ls -lh godot/build/NeonSurvivor.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
