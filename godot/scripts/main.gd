@@ -1,2 +1,3 @@
 extends Node2D
-# RESTORE_PENDING
+# Neon Survivor stable Android core
+const CYAN := Color("#41E8FF")
