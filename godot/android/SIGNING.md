@@ -25,8 +25,8 @@ The workflow uses these secrets when present; otherwise it falls back to the val
 ### Package identity
 
 - Application ID: `com.abolfazl.neonsurvivor`
-- Version name: `1.1.0`
-- Version code: `3` (must increase for every Play upload)
+- Version name: `1.1.2`
+- Version code: `5` (must increase for every Play upload)
 
 ### Play Console notes
 
