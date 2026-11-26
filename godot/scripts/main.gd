@@ -1,1 +1,2 @@
-PLACEHOLDER
+extends Node2D
+# RESTORE_PENDING
