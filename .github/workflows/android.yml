@@ -58,7 +58,8 @@ jobs:
           python3 << 'PY'
           import base64
           from pathlib import Path
-          from PIL import Image
+          from PIL import Image, ImageDraw
+          import binascii
 
           def decode(b64_path: Path, out_path: Path):
               data = base64.b64decode(b64_path.read_text().strip())
@@ -74,16 +75,38 @@ jobs:
           src_b64 = root / "icons/source.jpg.b64"
           if part1.exists() and part2.exists():
               src_b64.write_text(part1.read_text().strip() + part2.read_text().strip())
-          if not src_b64.exists():
-              raise SystemExit("missing godot/icons/source.jpg.b64 (or part1/part2)")
-          jpg_path = root / "icons/source.jpg"
-          decode(src_b64, jpg_path)
-          src = Image.open(jpg_path).convert("RGBA")
-          w, h = src.size
-          side = min(w, h)
-          left = (w - side) // 2
-          top = (h - side) // 2
-          crop = src.crop((left, top, left + side, top + side))
+
+          crop = None
+          if src_b64.exists() and src_b64.stat().st_size > 100:
+              try:
+                  jpg_path = root / "icons/source.jpg"
+                  decode(src_b64, jpg_path)
+                  src = Image.open(jpg_path).convert("RGBA")
+                  w, h = src.size
+                  side = min(w, h)
+                  left = (w - side) // 2
+                  top = (h - side) // 2
+                  crop = src.crop((left, top, left + side, top + side))
+                  print(f"using provided source image {w}x{h}")
+              except (binascii.Error, Exception) as e:
+                  print(f"source.jpg.b64 invalid ({e}), generating procedural neon icon")
+                  crop = None
+
+          if crop is None:
+              size = 512
+              img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+              draw = ImageDraw.Draw(img)
+              cx, cy = size // 2, size // 2
+              r = 230
+              for i in range(18, 0, -1):
+                  alpha = int(35 * (i / 18))
+                  draw.ellipse([cx - r - i, cy - r - i, cx + r + i, cy + r + i], fill=(45, 200, 255, alpha))
+              draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(8, 20, 40, 255), outline=(45, 200, 255, 255), width=10)
+              points = [(cx, cy - 150), (cx - 110, cy + 90), (cx - 35, cy + 35), (cx, cy + 70), (cx + 35, cy + 35), (cx + 110, cy + 90)]
+              draw.polygon(points, fill=(180, 230, 255, 255))
+              draw.ellipse([cx - 28, cy - 28, cx + 28, cy + 28], fill=(45, 200, 255, 255))
+              crop = img
+              print("generated procedural neon jet icon")
 
           def save_resized(size, path):
               im = crop.resize((size, size), Image.Resampling.LANCZOS)
@@ -94,7 +117,7 @@ jobs:
           save_resized(512, root / "icon.png")
           save_resized(192, root / "icons/icon_192.png")
           save_resized(432, root / "icons/icon_adaptive_fg.png")
-          Image.new("RGBA", (432, 432), (90, 170, 230, 255)).save(root / "icons/icon_adaptive_bg.png", "PNG")
+          Image.new("RGBA", (432, 432), (12, 40, 70, 255)).save(root / "icons/icon_adaptive_bg.png", "PNG")
           PY
           test -s godot/icon.png
           test -s godot/icons/icon_192.png
