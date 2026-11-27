@@ -19,6 +19,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Patch main.gd (safe font + non-blank draw + restore if broken)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          from pathlib import Path
+          import urllib.request
+          p = Path("godot/scripts/main.gd")
+          text = p.read_text() if p.exists() else ""
+          if "PLACEHOLDER" in text or len(text) < 1000 or "extends Node2D" not in text:
+              url = "https://raw.githubusercontent.com/Abolfazlsoltan/Parvaz/d00a47f67c4f661dd913112b00a3e186f7c54e25/godot/scripts/main.gd"
+              text = urllib.request.urlopen(url, timeout=60).read().decode()
+              print("restored main.gd from known-good commit, bytes", len(text))
+          old_text = "func _text(value: String,pos: Vector2,size: int,color: Color,centered: bool=true) -> void:\n var font:=ThemeDB.fallback_font\n var width:=font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x\n draw_string(font,Vector2(pos.x-width*0.5 if centered else pos.x,pos.y),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)"
+          new_text = "func _text(value: String,pos: Vector2,size: int,color: Color,centered: bool=true) -> void:\n var font: Font = ThemeDB.fallback_font\n if font == null:\n  font = SystemFont.new()\n var width:=font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x\n draw_string(font,Vector2(pos.x-width*0.5 if centered else pos.x,pos.y),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)"
+          if old_text in text:
+              text = text.replace(old_text, new_text)
+              print("patched _text")
+          elif "SystemFont.new()" in text:
+              print("_text already patched")
+          else:
+              print("WARN: _text pattern not found")
+          old_ready = " get_viewport().size_changed.connect(_resize)\n"
+          if old_ready in text and "queue_redraw()\n" not in text[text.find("func _ready"):text.find("func _ready")+600]:
+              text = text.replace(old_ready, " get_viewport().size_changed.connect(_resize)\n queue_redraw()\n", 1)
+              print("patched _ready")
+          old_draw = "func _draw() -> void:\n var size:=get_viewport_rect().size\n viewport_size=size\n # Source V3.5 background gradient, subdued orbital nebulae and structural silhouettes.\n if background_gradient!=null:\n  draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)\n else:\n  draw_rect(Rect2(Vector2.ZERO,size),BG)\n"
+          new_draw = "func _draw() -> void:\n var size:=get_viewport_rect().size\n if size.x < 2.0 or size.y < 2.0:\n  size = Vector2(960, 540)\n viewport_size=size\n # Always fill background first so screen is never blank\n draw_rect(Rect2(Vector2.ZERO,size),BG)\n if background_gradient!=null:\n  draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)\n"
+          if old_draw in text:
+              text = text.replace(old_draw, new_draw)
+              print("patched _draw")
+          elif "Always fill background" in text:
+              print("_draw already patched")
+          else:
+              print("WARN: _draw pattern not found")
+          p.write_text(text)
+          print("main.gd final size", p.stat().st_size)
+          assert "extends Node2D" in text
+          PY
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -195,7 +235,9 @@ jobs:
           test -s "$HOME/.android/debug.keystore"
           test -s godot/android/neonsurvivor-release.keystore
           test -s godot/icon.png
-          echo "Toolchain + icons + release keystore OK."
+          test -s godot/scripts/main.gd
+          grep -q "extends Node2D" godot/scripts/main.gd
+          echo "Toolchain + icons + release keystore + main.gd OK."
 
       - name: Validate Godot project
         run: godot --headless --path godot --editor --quit-after 2 || godot --headless --path godot --editor --quit
