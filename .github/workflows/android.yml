@@ -1,4 +1,4 @@
-name: Build Neon Survivor Android APK
+name: Build Parvaz Android APK
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'godot/**'
       - '.github/workflows/android.yml'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -19,46 +20,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Patch main.gd (safe font + non-blank draw + restore if broken)
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 << 'PY'
-          from pathlib import Path
-          import urllib.request
-          p = Path("godot/scripts/main.gd")
-          text = p.read_text() if p.exists() else ""
-          if "PLACEHOLDER" in text or len(text) < 1000 or "extends Node2D" not in text:
-              url = "https://raw.githubusercontent.com/Abolfazlsoltan/Parvaz/d00a47f67c4f661dd913112b00a3e186f7c54e25/godot/scripts/main.gd"
-              text = urllib.request.urlopen(url, timeout=60).read().decode()
-              print("restored main.gd from known-good commit, bytes", len(text))
-          old_text = "func _text(value: String,pos: Vector2,size: int,color: Color,centered: bool=true) -> void:\n var font:=ThemeDB.fallback_font\n var width:=font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x\n draw_string(font,Vector2(pos.x-width*0.5 if centered else pos.x,pos.y),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)"
-          new_text = "func _text(value: String,pos: Vector2,size: int,color: Color,centered: bool=true) -> void:\n var font: Font = ThemeDB.fallback_font\n if font == null:\n  font = SystemFont.new()\n var width:=font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size).x\n draw_string(font,Vector2(pos.x-width*0.5 if centered else pos.x,pos.y),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size,color)"
-          if old_text in text:
-              text = text.replace(old_text, new_text)
-              print("patched _text")
-          elif "SystemFont.new()" in text:
-              print("_text already patched")
-          else:
-              print("WARN: _text pattern not found")
-          old_ready = " get_viewport().size_changed.connect(_resize)\n"
-          if old_ready in text and "queue_redraw()\n" not in text[text.find("func _ready"):text.find("func _ready")+600]:
-              text = text.replace(old_ready, " get_viewport().size_changed.connect(_resize)\n queue_redraw()\n", 1)
-              print("patched _ready")
-          old_draw = "func _draw() -> void:\n var size:=get_viewport_rect().size\n viewport_size=size\n # Source V3.5 background gradient, subdued orbital nebulae and structural silhouettes.\n if background_gradient!=null:\n  draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)\n else:\n  draw_rect(Rect2(Vector2.ZERO,size),BG)\n"
-          new_draw = "func _draw() -> void:\n var size:=get_viewport_rect().size\n if size.x < 2.0 or size.y < 2.0:\n  size = Vector2(960, 540)\n viewport_size=size\n # Always fill background first so screen is never blank\n draw_rect(Rect2(Vector2.ZERO,size),BG)\n if background_gradient!=null:\n  draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)\n"
-          if old_draw in text:
-              text = text.replace(old_draw, new_draw)
-              print("patched _draw")
-          elif "Always fill background" in text:
-              print("_draw already patched")
-          else:
-              print("WARN: _draw pattern not found")
-          p.write_text(text)
-          print("main.gd final size", p.stat().st_size)
-          assert "extends Node2D" in text
-          PY
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -69,17 +30,23 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
-          packages: platform-tools platforms;android-34 build-tools;34.0.0 cmdline-tools;latest cmake;3.10.2.4988404 ndk;23.2.8568313
+          packages: |
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            cmdline-tools;latest
+            cmake;3.10.2.4988404
+            ndk;23.2.8568313
 
       - name: Install Godot 4.4.1 and export templates
         shell: bash
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP"
-          curl -L --fail --retry 3 -o godot.zip "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip"
+          curl -fsSL --retry 3 -o godot.zip "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip"
           unzip -q godot.zip
           sudo install -m 0755 Godot_v4.4.1-stable_linux.x86_64 /usr/local/bin/godot
-          curl -L --fail --retry 3 -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz"
+          curl -fsSL --retry 3 -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz"
           mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
           mkdir -p "$RUNNER_TEMP/godot-templates"
           unzip -q templates.tpz -d "$RUNNER_TEMP/godot-templates"
@@ -90,159 +57,96 @@ jobs:
           fi
           godot --version
 
-      - name: Decode icons and release keystore
+      - name: Generate clean Android launcher icons
         shell: bash
         run: |
           set -euo pipefail
-          pip install --quiet pillow
-          python3 << 'PY'
-          import base64
+          python3 -m pip install --quiet pillow
+          python3 <<'PY'
           from pathlib import Path
           from PIL import Image, ImageDraw
-          import binascii
-
-          def decode(b64_path: Path, out_path: Path):
-              data = base64.b64decode(b64_path.read_text().strip())
-              out_path.parent.mkdir(parents=True, exist_ok=True)
-              out_path.write_bytes(data)
-              print(f"decoded {b64_path.name} -> {out_path} ({len(data)} bytes)")
 
           root = Path("godot")
-          decode(root / "android/neonsurvivor-release.keystore.b64", root / "android/neonsurvivor-release.keystore")
+          icon_dir = root / "icons"
+          icon_dir.mkdir(parents=True, exist_ok=True)
 
-          part1 = root / "icons/source.jpg.b64.part1"
-          part2 = root / "icons/source.jpg.b64.part2"
-          src_b64 = root / "icons/source.jpg.b64"
-          if part1.exists() and part2.exists():
-              src_b64.write_text(part1.read_text().strip() + part2.read_text().strip())
+          size = 512
+          image = Image.new("RGBA", (size, size), (5, 12, 30, 255))
+          draw = ImageDraw.Draw(image)
+          cx = cy = size // 2
 
-          crop = None
-          if src_b64.exists() and src_b64.stat().st_size > 100:
-              try:
-                  jpg_path = root / "icons/source.jpg"
-                  decode(src_b64, jpg_path)
-                  src = Image.open(jpg_path).convert("RGBA")
-                  w, h = src.size
-                  side = min(w, h)
-                  left = (w - side) // 2
-                  top = (h - side) // 2
-                  crop = src.crop((left, top, left + side, top + side))
-                  print(f"using provided source image {w}x{h}")
-              except (binascii.Error, Exception) as e:
-                  print(f"source.jpg.b64 invalid ({e}), generating procedural neon icon")
-                  crop = None
+          for radius in range(232, 150, -4):
+              alpha = max(4, int(42 * (radius - 150) / 82))
+              draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius),
+                           fill=(18, 115, 160, alpha))
+          draw.ellipse((38, 38, 474, 474), fill=(8, 23, 48, 255),
+                       outline=(55, 224, 255, 255), width=12)
+          draw.ellipse((68, 68, 444, 444), outline=(26, 115, 160, 255), width=3)
 
-          if crop is None:
-              size = 512
-              img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-              draw = ImageDraw.Draw(img)
-              cx, cy = size // 2, size // 2
-              r = 230
-              for i in range(18, 0, -1):
-                  alpha = int(35 * (i / 18))
-                  draw.ellipse([cx - r - i, cy - r - i, cx + r + i, cy + r + i], fill=(45, 200, 255, alpha))
-              draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(8, 20, 40, 255), outline=(45, 200, 255, 255), width=10)
-              points = [(cx, cy - 150), (cx - 110, cy + 90), (cx - 35, cy + 35), (cx, cy + 70), (cx + 35, cy + 35), (cx + 110, cy + 90)]
-              draw.polygon(points, fill=(180, 230, 255, 255))
-              draw.ellipse([cx - 28, cy - 28, cx + 28, cy + 28], fill=(45, 200, 255, 255))
-              crop = img
-              print("generated procedural neon jet icon")
+          plane = [
+              (256, 94), (283, 215), (393, 304), (386, 333),
+              (280, 302), (270, 397), (316, 430), (310, 447),
+              (256, 425), (202, 447), (196, 430), (242, 397),
+              (232, 302), (126, 333), (119, 304), (229, 215)
+          ]
+          draw.polygon(plane, fill=(190, 244, 255, 255))
+          draw.ellipse((242, 228, 270, 256), fill=(55, 224, 255, 255))
+          draw.line((256, 108, 256, 193), fill=(255, 255, 255, 220), width=4)
 
-          def save_resized(size, path):
-              im = crop.resize((size, size), Image.Resampling.LANCZOS)
+          def save_icon(img, path, side):
+              resized = img.resize((side, side), Image.Resampling.LANCZOS)
               path.parent.mkdir(parents=True, exist_ok=True)
-              im.save(path, "PNG")
-              print(f"icon {path} {size}x{size}")
+              resized.save(path, "PNG", optimize=True)
 
-          save_resized(512, root / "icon.png")
-          save_resized(192, root / "icons/icon_192.png")
-          save_resized(432, root / "icons/icon_adaptive_fg.png")
-          Image.new("RGBA", (432, 432), (12, 40, 70, 255)).save(root / "icons/icon_adaptive_bg.png", "PNG")
+          save_icon(image, root / "icon.png", 512)
+          save_icon(image, icon_dir / "icon_192.png", 192)
+          save_icon(image, icon_dir / "icon_adaptive_fg.png", 432)
+          Image.new("RGBA", (432, 432), (8, 23, 48, 255)).save(
+              icon_dir / "icon_adaptive_bg.png", "PNG", optimize=True
+          )
+          print("Generated all Godot Android icon resources.")
           PY
           test -s godot/icon.png
           test -s godot/icons/icon_192.png
           test -s godot/icons/icon_adaptive_fg.png
-          test -s godot/android/neonsurvivor-release.keystore
-          echo "Icons and keystore ready."
+          test -s godot/icons/icon_adaptive_bg.png
 
-      - name: Configure Android export (debug + release keystores)
+      - name: Create ephemeral Android debug signing key
         shell: bash
-        env:
-          RELEASE_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          RELEASE_KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          export RELEASE_KEYSTORE_PASS="${RELEASE_KEYSTORE_PASS:-NeonSurvivor2026!}"
-          export RELEASE_KEY_ALIAS="${RELEASE_KEY_ALIAS:-neonsurvivor}"
-          export RELEASE_KEY_PASS="${RELEASE_KEY_PASS:-NeonSurvivor2026!}"
-          mkdir -p "$HOME/.config/godot" "$HOME/.android" "$GITHUB_WORKSPACE/.android"
+          mkdir -p "$HOME/.android" "$GITHUB_WORKSPACE/.android"
           keytool -genkeypair -noprompt \
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android -alias androiddebugkey -keypass android \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
           cp "$HOME/.android/debug.keystore" "$GITHUB_WORKSPACE/.android/debug.keystore"
-          KS_PATH="$GITHUB_WORKSPACE/godot/android/neonsurvivor-release.keystore"
-          test -s "$KS_PATH"
-          python3 << PY
-          from pathlib import Path
-          import os
-          p = Path("godot/export_presets.cfg")
-          text = p.read_text()
-          ks = os.environ["GITHUB_WORKSPACE"] + "/godot/android/neonsurvivor-release.keystore"
-          passwd = os.environ["RELEASE_KEYSTORE_PASS"]
-          alias = os.environ["RELEASE_KEY_ALIAS"]
-          lines = []
-          for line in text.splitlines():
-              if line.startswith("keystore/release="):
-                  lines.append(f'keystore/release="{ks}"')
-              elif line.startswith("keystore/release_user="):
-                  lines.append(f'keystore/release_user="{alias}"')
-              elif line.startswith("keystore/release_password="):
-                  lines.append(f'keystore/release_password="{passwd}"')
-              elif line.startswith("keystore/debug="):
-                  lines.append(f'keystore/debug="{os.environ["HOME"]}/.android/debug.keystore"')
-              else:
-                  lines.append(line)
-          p.write_text("\n".join(lines) + "\n")
-          print("export_presets.cfg keystore paths updated")
-          PY
-          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
-          [gd_resource type="EditorSettings" format=3]
+          test -s "$HOME/.android/debug.keystore"
 
-          [resource]
-          export/android/android_sdk_path = "$ANDROID_HOME"
-          export/android/java_sdk_path = "$JAVA_HOME"
-          export/android/debug_keystore = "$HOME/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          export/android/keystore = "$KS_PATH"
-          export/android/keystore_user = "$RELEASE_KEY_ALIAS"
-          export/android/keystore_pass = "$RELEASE_KEYSTORE_PASS"
-          EOF
-          echo "Editor settings configured for release signing."
-
-      - name: Verify Android toolchain
+      - name: Import and validate Godot project
         shell: bash
         run: |
           set -euo pipefail
-          test -x "$ANDROID_HOME/platform-tools/adb"
-          test -d "$ANDROID_HOME/platforms/android-34"
-          test -d "$ANDROID_HOME/build-tools/34.0.0"
-          test -d "$ANDROID_HOME/ndk/23.2.8568313"
-          test -x "$JAVA_HOME/bin/java"
-          test -s "$HOME/.android/debug.keystore"
-          test -s godot/android/neonsurvivor-release.keystore
-          test -s godot/icon.png
-          test -s godot/scripts/main.gd
-          grep -q "extends Node2D" godot/scripts/main.gd
-          echo "Toolchain + icons + release keystore + main.gd OK."
+          godot --headless --path godot --editor --quit --verbose 2>&1 | tee "$RUNNER_TEMP/godot-editor.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script|ERROR: Error importing' "$RUNNER_TEMP/godot-editor.log"; then
+            echo "Godot editor validation reported a script or resource error."
+            exit 1
+          fi
 
-      - name: Validate Godot project
-        run: godot --headless --path godot --editor --quit-after 2 || godot --headless --path godot --editor --quit
+      - name: Run headless game startup smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot --quit-after 12 --verbose 2>&1 | tee "$RUNNER_TEMP/godot-runtime.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script|ERROR: Error loading' "$RUNNER_TEMP/godot-runtime.log"; then
+            echo "The game failed its startup smoke test."
+            exit 1
+          fi
+          echo "Main scene started successfully for 12 frames."
 
-      - name: Export signed release APK
+      - name: Export Android APK
+        shell: bash
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.android/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -250,14 +154,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p godot/build
-          godot --headless --path godot --export-release "Android" build/NeonSurvivor.apk --verbose 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
-          test -s godot/build/NeonSurvivor.apk
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs godot/build/NeonSurvivor.apk || true
-          ls -lh godot/build/NeonSurvivor.apk
+          godot --headless --path godot --export-debug "Android" build/NeonSurvivor.apk --verbose 2>&1 | tee "$RUNNER_TEMP/godot-export.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script|ERROR: Error importing' "$RUNNER_TEMP/godot-export.log"; then
+            echo "Godot export logged script or resource errors; refusing to publish this APK."
+            exit 1
+          fi
+          APK="godot/build/NeonSurvivor.apk"
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
+          ls -lh "$APK"
 
-      - name: Upload APK
+      - name: Upload validated APK
         uses: actions/upload-artifact@v4
         with:
-          name: NeonSurvivor-Android-APK
+          name: Parvaz-Android-APK
           path: godot/build/NeonSurvivor.apk
           if-no-files-found: error
