@@ -1247,8 +1247,8 @@ func _build_hangar_ui() -> void:
  grid.add_theme_constant_override("v_separation",10)
  content.add_child(grid)
  for ship in SHIPS:
-  var unlocked:=unlocked_ships.has(ship.id)
-  var selected:=selected_ship==ship.id
+  var unlocked: bool = unlocked_ships.has(str(ship.id))
+  var selected: bool = selected_ship==str(ship.id)
   var status:=_loc("انتخاب شده","EQUIPPED") if selected else (_loc("در دسترس","UNLOCKED") if unlocked else _loc("پس از مرحلهٔ %s" % _fa_number(ship.stage),"UNLOCK AT MISSION %d" % ship.stage))
   var caption:=str(ship.name)+"\n"+_loc("زره %s  •  قدرت %s٪" % [_fa_number(ship.hp),_fa_number(int(ship.damage*100))],"ARMOR %d  •  DAMAGE %d%%" % [ship.hp,int(ship.damage*100)])+"\n"+_ship_description(str(ship.id))+"\n"+status
   _ui_button(grid,caption,ship.primary if unlocked else Color("#65738A"),154,Callable(self,"_ui_select_ship").bind(str(ship.id)),not unlocked)
@@ -1325,7 +1325,7 @@ func _build_settings_ui() -> void:
  var diff_ids:Array[String]=["easy","normal","hard","nightmare"]
  var diff_fa:Array[String]=["آسان","معمولی","سخت","کابوس"]
  for i in range(diff_ids.size()):
-  var label:=diff_fa[i] if language=="fa" else DIFFICULTIES[diff_ids[i]].label
+  var label: String = str(diff_fa[i]) if language=="fa" else str(DIFFICULTIES[diff_ids[i]].label)
   if difficulty==diff_ids[i]:label+=" ✓"
   _ui_button(diff_grid,label,CYAN if difficulty==diff_ids[i] else PURPLE,60,Callable(self,"_ui_set_difficulty").bind(diff_ids[i]))
  _ui_label(gameplay,_loc("نرخ فریم","FRAME RATE"),18,Color("#C7D9EE"))
