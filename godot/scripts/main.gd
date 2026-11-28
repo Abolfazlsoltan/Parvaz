@@ -994,11 +994,11 @@ func _click_ui(pos: Vector2) -> void:
   _save()
   return
  if state=="menu":
-  if Rect2(w*0.18,h*0.53,w*0.64,h*0.07).has_point(pos):state="stages"
-  elif Rect2(w*0.18,h*0.612,w*0.64,h*0.07).has_point(pos):state="hangar"
-  elif Rect2(w*0.18,h*0.694,w*0.64,h*0.07).has_point(pos):state="settings"
-  elif Rect2(w*0.18,h*0.776,w*0.64,h*0.07).has_point(pos):state="help"
-  elif Rect2(w*0.18,h*0.858,w*0.64,h*0.07).has_point(pos):
+  if Rect2(w*0.18,h*0.535,w*0.64,h*0.082).has_point(pos):state="stages"
+  elif Rect2(w*0.18,h*0.617,w*0.64,h*0.082).has_point(pos):state="hangar"
+  elif Rect2(w*0.18,h*0.699,w*0.64,h*0.082).has_point(pos):state="settings"
+  elif Rect2(w*0.18,h*0.781,w*0.64,h*0.082).has_point(pos):state="help"
+  elif Rect2(w*0.18,h*0.863,w*0.64,h*0.082).has_point(pos):
    achievements_return_state="menu"
    state="achievements"
  elif state=="stages":
@@ -1418,7 +1418,7 @@ func _draw_hud(size: Vector2) -> void:
   draw_rect(Rect2(bar_x,139,bar_w,8),Color("#252D4A"))
   var segment:=bar_w/float(maxi(1,total_subwaves))
   for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,141,maxf(2.0,segment-4),4),GOLD)
-  _text("CREDITS %d" % credits,Vector2(18,size.y-142),14,GOLD,false)
+  _text("CR %d" % credits,Vector2(size.x*0.78,103),12,GOLD)
  else:
   _text("SCORE %d" % score,Vector2(18,32),21,Color.WHITE,false)
   _text("%s • CR %d" % [_ship().name,credits],Vector2(18,56),13,_ship().primary,false)
@@ -1431,7 +1431,7 @@ func _draw_hud(size: Vector2) -> void:
   draw_rect(Rect2(bar_x,50,bar_w,7),Color("#252D4A"))
   var segment:=bar_w/float(maxi(1,total_subwaves))
   for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,52,maxf(2.0,segment-4),3),GOLD)
- var status_y:=size.y-136 if portrait else size.y-112
+ var status_y:=size.y-166 if portrait else size.y-145
  if shield:_text("AEGIS SHIELD",Vector2(18,status_y),13,CYAN,false);status_y+=22
  if overdrive_time>0:_text("OVERDRIVE %.1fs" % overdrive_time,Vector2(18,status_y),13,GREEN,false);status_y+=22
  if magnet_time>0:_text("MAGNET %.1fs" % magnet_time,Vector2(18,status_y),13,Color("#FFFF64"),false);status_y+=22
@@ -1463,11 +1463,11 @@ func _draw_menu(size: Vector2) -> void:
  draw_rect(strip,Color(0.04,0.09,0.17,0.95))
  draw_rect(strip,Color("#2D648E"),false,1)
  _text("CAMPAIGN %d/%d CLEARED • BEST %d • CR %d" % [max_unlocked_stage-1+int(campaign_complete),CAMPAIGN_STAGE_COUNT,best_stage,credits],Vector2(size.x*0.5,size.y*0.49),14,GOLD)
- _button(Rect2(size.x*0.18,size.y*0.53,size.x*0.64,size.y*0.07),"CAMPAIGN / LEVEL SELECT",GREEN)
- _button(Rect2(size.x*0.18,size.y*0.612,size.x*0.64,size.y*0.07),"HANGAR • FLEET %d/%d" % [unlocked_ships.size(),SHIPS.size()],GOLD)
- _button(Rect2(size.x*0.18,size.y*0.694,size.x*0.64,size.y*0.07),"SETTINGS",CYAN)
- _button(Rect2(size.x*0.18,size.y*0.776,size.x*0.64,size.y*0.07),"FLIGHT SCHOOL / HELP",PURPLE)
- _button(Rect2(size.x*0.18,size.y*0.858,size.x*0.64,size.y*0.07),"ACHIEVEMENTS",Color("#8E9BFF"))
+ _button(Rect2(size.x*0.18,size.y*0.535,size.x*0.64,size.y*0.082),"CAMPAIGN / LEVEL SELECT",GREEN)
+ _button(Rect2(size.x*0.18,size.y*0.617,size.x*0.64,size.y*0.082),"HANGAR • FLEET %d/%d" % [unlocked_ships.size(),SHIPS.size()],GOLD)
+ _button(Rect2(size.x*0.18,size.y*0.699,size.x*0.64,size.y*0.082),"SETTINGS",CYAN)
+ _button(Rect2(size.x*0.18,size.y*0.781,size.x*0.64,size.y*0.082),"FLIGHT SCHOOL / HELP",PURPLE)
+ _button(Rect2(size.x*0.18,size.y*0.863,size.x*0.64,size.y*0.082),"ACHIEVEMENTS",Color("#8E9BFF"))
  _text("DRAG TO STEER • AUTO FIRE • TAP DASH",Vector2(size.x*0.5,size.y*0.95),11,Color("#879EBE"))
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
 
@@ -1505,6 +1505,8 @@ func _draw_ship_icon(pos: Vector2,color: Color,r: int,ship_id: String="viper") -
   "valkyrie":shape=PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.3,-r*0.25),Vector2(r*1.1,r*0.25),Vector2(r*0.8,r*0.55),Vector2(r*0.38,r*0.35),Vector2(0,r*0.7),Vector2(-r*0.38,r*0.35),Vector2(-r*0.8,r*0.55),Vector2(-r*1.1,r*0.25),Vector2(-r*0.3,-r*0.25)])
   "phantom":shape=PackedVector2Array([Vector2(0,-r*1.4),Vector2(r*0.18,r*0.55),Vector2(r*0.85,r*0.35),Vector2(r*0.45,r*0.72),Vector2(0,r*0.4),Vector2(-r*0.45,r*0.72),Vector2(-r*0.85,r*0.35),Vector2(-r*0.18,r*0.55)])
   "titan":shape=PackedVector2Array([Vector2(0,-r*1.2),Vector2(r*0.4,-r*0.25),Vector2(r*1.25,r*0.5),Vector2(r*0.9,r*0.85),Vector2(r*0.35,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.35,r*0.55),Vector2(-r*0.9,r*0.85),Vector2(-r*1.25,r*0.5),Vector2(-r*0.4,-r*0.25)])
+ if shape.is_empty():
+  shape=PackedVector2Array([Vector2(0,-r*1.3),Vector2(r*0.25,-r*0.25),Vector2(r*1.0,r*0.45),Vector2(r*0.6,r*0.55),Vector2(0,r*0.35),Vector2(-r*0.6,r*0.55),Vector2(-r*1.0,r*0.45),Vector2(-r*0.25,-r*0.25)])
  draw_set_transform(pos,0,Vector2.ONE)
  draw_colored_polygon(shape,color)
  shape.append(shape[0])

@@ -7,6 +7,12 @@ on:
       - 'godot/**'
       - '.github/workflows/android.yml'
       - 'README.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/android.yml'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
