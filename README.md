@@ -4,6 +4,12 @@ Parvaz is a mobile-first arcade aircraft game built with **Godot 4.4.1**. The na
 
 ## Current game features
 
+- Portrait-first Android interface, built with Godot Control nodes rather than manual touch hit-testing.
+- Persian is the default language; English can be selected in Settings. The selection is saved.
+- Large, scrollable menus and settings, with all sound controls inside Settings.
+- Touch input is routed to gameplay only after native UI controls have consumed their events.
+- The game does not request camera, microphone, location, storage, network or vibration permissions. Gameplay and progress are local.
+
 - An eight-mission campaign with sequential unlocks and persistent progress.
 - Four additional mission slots shown as locked, ready for future updates.
 - Eight playable aircraft with different handling, armor and weapon patterns.
