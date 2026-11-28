@@ -2,9 +2,9 @@
 config_version=5
 
 [application]
-config/name="NEON SURVIVOR"
-config/description="Neon space combat survival. Touch to move, double-tap to dash."
-config/version="1.1.4"
+config/name="PARVAZ - AIR COMBAT"
+config/description="Mobile-first arcade air-combat campaign with unlockable missions and aircraft."
+config/version="1.2.0"
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.4", "Mobile", "GL Compatibility")
 config/icon="res://icon.png"

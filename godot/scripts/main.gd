@@ -1,5 +1,5 @@
 extends Node2D
-# Neon Survivor V3.5 — native Godot port in progress.
+# Parvaz 1.2 — mobile-first campaign update.
 # Ported from NeonSurvivor_V3.5_Performance_UI.py. Keep gameplay data in sync with source.
 
 const BG := Color("#080B18")
@@ -10,6 +10,8 @@ const GOLD := Color("#FFD166")
 const PURPLE := Color("#B36BFF")
 const GREEN := Color("#65F59A")
 const SAVE_PATH := "user://neon_v3_save.json"
+const CAMPAIGN_STAGE_COUNT := 8
+const STAGE_TILE_COUNT := 12
 const SOUND_BANK_SCRIPT = preload("res://scripts/sound_bank.gd")
 
 const SHIPS := [
@@ -17,7 +19,10 @@ const SHIPS := [
  {"id":"interceptor","name":"SOLAR FALCON","role":"3-Way Spread & Quick Dash","stage":2,"cost":1500,"primary":Color8(255,215,70),"secondary":Color8(135,85,20),"bullet":Color8(255,235,110),"size":26,"hp":4,"rate":0.13,"speed":1060.0,"damage":0.95,"dash":0.65,"pattern":"spread3","ability":"35% Faster Dash Cooldown"},
  {"id":"valkyrie","name":"VALKYRIE X","role":"Homing Missiles + Laser","stage":4,"cost":4000,"primary":Color8(110,255,145),"secondary":Color8(25,115,65),"bullet":Color8(130,255,165),"size":28,"hp":5,"rate":0.14,"speed":980.0,"damage":1.15,"dash":0.90,"pattern":"homing","ability":"Auto-Homing Wing Missiles"},
  {"id":"phantom","name":"VOID PHANTOM","role":"Piercing Rail-Beams","stage":6,"cost":8000,"primary":Color8(140,180,255),"secondary":Color8(40,70,140),"bullet":Color8(180,210,255),"size":27,"hp":4,"rate":0.17,"speed":1280.0,"damage":1.85,"dash":0.75,"pattern":"pierce","ability":"Shots Pierce Through Enemies"},
- {"id":"titan","name":"AEGIS TITAN","role":"5-Cannon Heavy Cruiser","stage":8,"cost":14000,"primary":Color8(255,95,135),"secondary":Color8(135,28,55),"bullet":Color8(255,135,165),"size":31,"hp":6,"rate":0.16,"speed":960.0,"damage":1.35,"dash":1.05,"pattern":"heavy5","ability":"Heavy Armor + 5-Gun Barrage"}
+ {"id":"titan","name":"AEGIS TITAN","role":"5-Cannon Heavy Cruiser","stage":8,"cost":14000,"primary":Color8(255,95,135),"secondary":Color8(135,28,55),"bullet":Color8(255,135,165),"size":31,"hp":6,"rate":0.16,"speed":960.0,"damage":1.35,"dash":1.05,"pattern":"heavy5","ability":"Heavy Armor + 5-Gun Barrage"},
+ {"id":"raptor","name":"RAPTOR X","role":"Rapid Smart-Volley Fighter","stage":3,"cost":2600,"primary":Color8(255,150,75),"secondary":Color8(120,55,24),"bullet":Color8(255,185,110),"size":25,"hp":4,"rate":0.10,"speed":1180.0,"damage":1.08,"dash":0.72,"pattern":"volley","ability":"Three-Lane Burst Fire"},
+ {"id":"nova","name":"NOVA WARDEN","role":"Armored Pulse Interceptor","stage":5,"cost":5600,"primary":Color8(220,125,255),"secondary":Color8(85,38,125),"bullet":Color8(235,170,255),"size":29,"hp":6,"rate":0.18,"speed":960.0,"damage":1.55,"dash":0.98,"pattern":"pierce","ability":"High-Damage Piercing Pulse"},
+ {"id":"oracle","name":"ORACLE-7","role":"Autonomous Seeker Fighter","stage":7,"cost":10200,"primary":Color8(100,255,220),"secondary":Color8(20,105,100),"bullet":Color8(125,255,230),"size":27,"hp":5,"rate":0.13,"speed":1100.0,"damage":1.2,"dash":0.82,"pattern":"smart","ability":"Dual Homing Smart Missiles"}
 ]
 const DIFFICULTIES := {"easy":{"hp":0.7,"speed":0.8,"reward":0.8,"label":"CADET"},"normal":{"hp":1.0,"speed":1.0,"reward":1.0,"label":"PILOT"},"hard":{"hp":1.4,"speed":1.2,"reward":1.3,"label":"ACE"},"nightmare":{"hp":2.0,"speed":1.4,"reward":1.8,"label":"NIGHTMARE"}}
 const ENEMY_TYPES := {"scout":{"hp":2,"speed":135.0,"r":18.0,"color":Color8(255,65,110),"score":25},"interceptor":{"hp":2,"speed":210.0,"r":16.0,"color":Color8(255,215,60),"score":40},"gunship":{"hp":9,"speed":85.0,"r":29.0,"color":Color8(120,160,255),"score":110},"boss":{"hp":85,"speed":75.0,"r":60.0,"color":Color8(255,85,120),"score":800}}
@@ -38,7 +43,7 @@ const ACHIEVEMENTS := [
  {"id":"perfectionist","name":"Perfectionist","desc":"Complete 5 stages with full HP"},
  {"id":"marathon","name":"Marathon","desc":"Play 20 runs"}
 ]
-const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AEGIS SHIELD"},"overdrive":{"color":Color8(95,255,130),"symbol":"W","label":"WEAPON OVERDRIVE"},"morph":{"color":Color8(255,185,60),"symbol":"X","label":"SHIP MORPH CORE"},"repair":{"color":Color8(255,95,130),"symbol":"+","label":"HULL REPAIR"},"nuke":{"color":Color.WHITE,"symbol":"N","label":"EMP NOVA"},"magnet":{"color":Color8(255,255,100),"symbol":"M","label":"MAGNET PULSE"},"slow":{"color":Color8(180,200,255),"symbol":"T","label":"TIME DILATION"}}
+const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AEGIS SHIELD"},"overdrive":{"color":Color8(95,255,130),"symbol":"W","label":"WEAPON OVERDRIVE"},"morph":{"color":Color8(255,185,60),"symbol":"X","label":"SHIP MORPH CORE"},"repair":{"color":Color8(255,95,130),"symbol":"+","label":"HULL REPAIR"},"nuke":{"color":Color.WHITE,"symbol":"N","label":"EMP NOVA"},"magnet":{"color":Color8(255,255,100),"symbol":"M","label":"MAGNET PULSE"},"slow":{"color":Color8(180,200,255),"symbol":"T","label":"TIME DILATION"},"targeting":{"color":Color8(115,255,190),"symbol":"A","label":"SMART TARGETING"},"wingman":{"color":Color8(190,145,255),"symbol":"W","label":"WINGMAN ESCORT"}}
 
 var rng := RandomNumberGenerator.new()
 var sound_bank: Node
@@ -53,6 +58,9 @@ var unlocked_ships: Array[String] = ["viper"]
 var credits := 0
 var high_score := 0
 var best_stage := 1
+var max_unlocked_stage := 1
+var selected_stage := 1
+var campaign_complete := false
 var score := 0
 var lives := 3
 var stage := 1
@@ -83,6 +91,10 @@ var shield := false
 var overdrive_time := 0.0
 var magnet_time := 0.0
 var slow_time := 0.0
+var targeting_time := 0.0
+var wingman_time := 0.0
+var wingman_fire_cd := 0.0
+var victory_fly_time := 0.0
 var fire_cooldown := 0.0
 var combo := 1
 var combo_time := 0.0
@@ -213,6 +225,9 @@ func _load_save() -> void:
   return
  high_score = maxi(0,int(data.get("hi",0)))
  best_stage = maxi(1,int(data.get("best_stage",1)))
+ max_unlocked_stage = clampi(int(data.get("max_unlocked_stage",mini(best_stage,CAMPAIGN_STAGE_COUNT))),1,CAMPAIGN_STAGE_COUNT)
+ selected_stage = clampi(int(data.get("selected_stage",1)),1,max_unlocked_stage)
+ campaign_complete = data.get("campaign_complete",false) == true
  credits = maxi(0,int(data.get("credits",0)))
  target_fps = 60 if int(data.get("target_fps",45)) >= 60 else 45
  var saved_ships: Variant = data.get("unlocked_ships",["viper"])
@@ -242,7 +257,7 @@ func _load_save() -> void:
 
 func _save() -> void:
  _sync_audio()
- var data := {"hi":high_score,"best_stage":best_stage,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
+ var data := {"hi":high_score,"best_stage":best_stage,"max_unlocked_stage":max_unlocked_stage,"selected_stage":selected_stage,"campaign_complete":campaign_complete,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
  # Atomic-style temp save, mirroring the Python game's write-then-replace persistence.
  var temp_path:=SAVE_PATH+".tmp"
  var file:=FileAccess.open(temp_path,FileAccess.WRITE)
@@ -283,6 +298,10 @@ func _reset_run() -> void:
  overdrive_time = 0.0
  magnet_time = 0.0
  slow_time = 0.0
+ targeting_time = 0.0
+ wingman_time = 0.0
+ wingman_fire_cd = 0.0
+ victory_fly_time = 0.0
  fire_cooldown = 0.0
  combo = 1
  combo_time = 0.0
@@ -309,12 +328,13 @@ func _reset_run() -> void:
  banner_time = 0.0
  paused = false
 
-func _start_run() -> void:
+func _start_run(requested_stage: int = -1) -> void:
  _reset_run()
+ selected_stage = clampi(requested_stage if requested_stage > 0 else selected_stage,1,max_unlocked_stage)
  state = "play"
  total_runs += 1
  tutorial_active = not tutorial_done
- _start_stage(1)
+ _start_stage(selected_stage)
  if sound_bank!=null:
   sound_bank.play_sfx("subwave")
   sound_bank.start_music()
@@ -392,7 +412,14 @@ func _update_stage_director(dt: float) -> void:
    _check_ship_unlocks()
    _spawn_powerup(Vector2(viewport_size.x*0.5,viewport_size.y*0.35),"morph" if unlocked_ships.size()>1 else "overdrive")
    _check_achievements()
-   _start_stage(stage+1)
+   var cleared_stage := stage
+   max_unlocked_stage = clampi(maxi(max_unlocked_stage,cleared_stage+1),1,CAMPAIGN_STAGE_COUNT)
+   if cleared_stage >= CAMPAIGN_STAGE_COUNT:
+    campaign_complete = true
+   best_stage = maxi(best_stage,cleared_stage)
+   selected_stage = cleared_stage
+   victory_fly_time = 0.0
+   state = "stage_clear"
    _save()
 
 func _create_enemy(kind: String,pos: Vector2,mode: String="formation_hover",anchor: Vector2=Vector2.ZERO,dir_x: int=1,base_y: float=150.0,phase: float=0.0,hp_multiplier: float=1.0,shoot_cd: float=2.0) -> void:
@@ -406,7 +433,7 @@ func _create_enemy(kind: String,pos: Vector2,mode: String="formation_hover",anch
 func _spawn_powerup(pos: Vector2,kind: String="") -> void:
  if kind.is_empty():
   var roll := rng.randf()
-  kind = "shield" if roll<0.22 else "overdrive" if roll<0.46 else "morph" if roll<0.64 else "repair" if roll<0.78 else "nuke" if roll<0.84 else "magnet" if roll<0.94 else "slow"
+  kind = "shield" if roll<0.16 else "overdrive" if roll<0.30 else "targeting" if roll<0.43 else "wingman" if roll<0.55 else "morph" if roll<0.68 else "repair" if roll<0.80 else "nuke" if roll<0.87 else "magnet" if roll<0.95 else "slow"
  if powerups.size() >= 5:
   powerups.pop_front()
  powerups.append({"pos":pos,"vel":Vector2(0,58),"kind":kind,"time":11.0})
@@ -439,6 +466,7 @@ func _trigger_dash() -> void:
  if sound_bank!=null:sound_bank.play_sfx("dash")
  _shockwave(player,_ship().primary,80)
  _burst(player,_ship().primary,26,410,0.42)
+ if OS.has_feature("android"):Input.vibrate_handheld(22)
  _check_achievements()
 
 func _hurt_player() -> void:
@@ -451,6 +479,7 @@ func _hurt_player() -> void:
  if sound_bank!=null:sound_bank.play_sfx("hurt")
  _shockwave(player,PINK,115)
  _burst(player,PINK,42,460,0.85,4.2)
+ if OS.has_feature("android"):Input.vibrate_handheld(35)
  if hp <= 0:
   state = "over"
   tutorial_active = false
@@ -502,7 +531,7 @@ func _add_player_bullet(pos: Vector2,direction: Vector2,pierce: int=0,homing: bo
  var cfg := _ship()
  var dir := direction.normalized()
  var damage: float = cfg.damage*(1.35 if overdrive_time>0 else 1.0)
- bullets.append({"pos":pos,"vel":dir*cfg.speed,"dir":dir,"speed":cfg.speed,"life":1.35,"color":cfg.bullet,"damage":damage,"pierce":pierce,"homing":homing,"radius":radius,"hits":[]})
+ bullets.append({"pos":pos,"vel":dir*cfg.speed,"dir":dir,"speed":cfg.speed,"life":1.35,"color":cfg.bullet,"damage":damage,"pierce":pierce,"homing":homing or targeting_time>0.0,"radius":radius,"hits":[]})
 
 func _fire_weapons() -> void:
  var cfg := _ship()
@@ -529,6 +558,14 @@ func _fire_weapons() -> void:
   sfx="shoot_heavy"
   for angle in ([-0.28,-0.14,0.0,0.14,0.28] if overdrive_time<=0 else [-0.36,-0.24,-0.12,0.0,0.12,0.24,0.36]):
    _add_player_bullet(player+aim*24,aim.rotated(angle),0,false,5)
+ elif pattern == "volley":
+  for angle in ([-0.20,0.0,0.20] if overdrive_time<=0 else [-0.34,-0.17,0.0,0.17,0.34]):
+   _add_player_bullet(player+aim*23,aim.rotated(angle),0,false,4.5)
+ elif pattern == "smart":
+  sfx="shoot_plasma"
+  _add_player_bullet(player+aim*25,aim,0,true,5.5)
+  for angle in [-0.30,0.30]:
+   _add_player_bullet(player+aim*18+perpendicular*angle*22,aim.rotated(angle),0,true,4)
  if sound_bank!=null:sound_bank.play_sfx(sfx)
  muzzle_flash_time=0.045
  fire_cooldown = cfg.rate*(0.76 if overdrive_time>0 else 1.0)
@@ -542,6 +579,14 @@ func _process(delta: float) -> void:
  touch_ripple_time=maxf(0.0,touch_ripple_time-dt)
  for star in stars:
   star.pos.y = fposmod(star.pos.y+22.0*star.speed*dt,viewport_size.y)
+ if state=="stage_clear":
+  victory_fly_time += dt
+  if victory_fly_time < 0.95:
+   player.y -= maxf(760.0,viewport_size.y*1.8)*dt
+   aim_angle = -PI/2
+   if rng.randf()<0.35:_burst(player,_ship().primary,2,85,0.22,3.0)
+  queue_redraw()
+  return
  if state!="play" or paused or tutorial_active:
   flash_time=maxf(0.0,flash_time-dt)
   screen_shake=maxf(0.0,screen_shake-44.0*dt)
@@ -602,6 +647,17 @@ func _process(delta: float) -> void:
  fire_cooldown-=dt
  if fire_cooldown<=0.0:
   _fire_weapons()
+ targeting_time=maxf(0.0,targeting_time-dt)
+ wingman_time=maxf(0.0,wingman_time-dt)
+ if wingman_time>0.0:
+  wingman_fire_cd-=dt
+  if wingman_fire_cd<=0.0:
+   var escort_target: Variant = _nearest_enemy()
+   if escort_target!=null:
+    var escort_pos := player+Vector2(-46.0,20.0+sin(world_time*3.8)*10.0)
+    var escort_direction: Vector2 = (escort_target.pos-escort_pos).normalized()
+    _add_player_bullet(escort_pos+escort_direction*10.0,escort_direction,0,true,3.2)
+    wingman_fire_cd=0.38
  var living:=enemies.filter(func(enemy):return not enemy.dead)
  for bullet in bullets:
   if bullet.homing and not living.is_empty():
@@ -722,6 +778,7 @@ func _process(delta: float) -> void:
    _shockwave(player,POWERUPS[kind].color,95)
    _burst(player,POWERUPS[kind].color,28,360,0.6)
    powerups_collected+=1
+   if OS.has_feature("android"):Input.vibrate_handheld(16)
    match kind:
     "shield":shield=true
     "overdrive":overdrive_time=10.0
@@ -734,6 +791,10 @@ func _process(delta: float) -> void:
       if not enemy.dead:_kill_enemy(enemy,false)
     "magnet":magnet_time=8.0
     "slow":slow_time=6.0
+    "targeting":targeting_time=12.0
+    "wingman":
+     wingman_time=16.0
+     wingman_fire_cd=0.0
    _check_achievements()
  for particle in particles:
   particle.pos+=particle.vel*dt
@@ -878,7 +939,7 @@ func _pointer_down(pos: Vector2,id: int) -> void:
     state="menu"
     if sound_bank!=null:sound_bank.stop_music()
    return
-  if Rect2(w-154,h-102,140,82).has_point(pos):
+  if pos.distance_to(_dash_button_center(viewport_size))<=43.0:
    dash_requested=true
    return
   # Faithful mobile touch behavior: second finger or a quick double tap triggers dash.
@@ -933,18 +994,39 @@ func _click_ui(pos: Vector2) -> void:
   _save()
   return
  if state=="menu":
-  if Rect2(w*0.18,h*0.53,w*0.64,h*0.09).has_point(pos):_start_run()
-  elif Rect2(w*0.18,h*0.635,w*0.64,h*0.085).has_point(pos):state="hangar"
-  elif Rect2(w*0.18,h*0.735,w*0.64,h*0.085).has_point(pos):state="settings"
-  elif Rect2(w*0.18,h*0.835,w*0.64,h*0.085).has_point(pos):
+  if Rect2(w*0.18,h*0.535,w*0.64,h*0.082).has_point(pos):state="stages"
+  elif Rect2(w*0.18,h*0.617,w*0.64,h*0.082).has_point(pos):state="hangar"
+  elif Rect2(w*0.18,h*0.699,w*0.64,h*0.082).has_point(pos):state="settings"
+  elif Rect2(w*0.18,h*0.781,w*0.64,h*0.082).has_point(pos):state="help"
+  elif Rect2(w*0.18,h*0.863,w*0.64,h*0.082).has_point(pos):
    achievements_return_state="menu"
    state="achievements"
+ elif state=="stages":
+  if Rect2(12,12,130,48).has_point(pos):
+   state="menu"
+  else:
+   for i in range(STAGE_TILE_COUNT):
+    var number:=i+1
+    if _stage_tile_rect(i,viewport_size).has_point(pos):
+     if number<=CAMPAIGN_STAGE_COUNT and number<=max_unlocked_stage:
+      _start_run(number)
+     break
+ elif state=="help":
+  if Rect2(12,12,130,48).has_point(pos):state="menu"
+ elif state=="stage_clear":
+  if victory_fly_time<0.90:return
+  if stage<CAMPAIGN_STAGE_COUNT and Rect2(w*0.18,h*0.60,w*0.64,h*0.085).has_point(pos):
+   _start_run(stage+1)
+  elif Rect2(w*0.18,h*0.70,w*0.64,h*0.085).has_point(pos):
+   selected_stage=mini(max_unlocked_stage,stage+1)
+   state="stages"
+  elif Rect2(w*0.18,h*0.80,w*0.64,h*0.085).has_point(pos):state="menu"
  elif state=="hangar":
   if Rect2(12,12,130,48).has_point(pos):state="menu"
   else:
-   var columns:=2 if w<650 else 5
+   var columns:=2 if w<650 else 4
    var card_w:=w/columns
-   var card_h:=h*0.52 if w>=650 else h*0.23
+   var card_h:=h*0.17 if w<650 else h*0.37
    var top:=h*0.20
    for i in range(SHIPS.size()):
     var row:=floori(float(i)/float(columns))
@@ -985,7 +1067,7 @@ func _click_ui(pos: Vector2) -> void:
    elif state=="achievements":state=achievements_return_state
  elif state=="over":
   if pos.y>h*0.74:state="menu"
-  else:_start_run()
+  else:_start_run(stage)
  queue_redraw()
 
 func _draw() -> void:
@@ -1024,17 +1106,21 @@ func _draw() -> void:
  if touch_ripple_time>0.0:
   var progress:=1.0-touch_ripple_time/0.25
   draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
- if state=="play" or state=="over":
+ if state=="play" or state=="over" or state=="stage_clear":
   screen_shake_offset=Vector2(rng.randf_range(-screen_shake,screen_shake),rng.randf_range(-screen_shake,screen_shake)) if screen_shake>0.1 else Vector2.ZERO
   draw_set_transform(screen_shake_offset,0,Vector2.ONE)
   _draw_game()
   draw_set_transform(Vector2.ZERO)
  match state:
   "menu":_draw_menu(size)
+  "stages":_draw_stages(size)
   "hangar":_draw_hangar(size)
   "settings":_draw_settings(size)
+  "help":_draw_help(size)
   "achievements":_draw_achievements(size)
   "over":_draw_game_over(size)
+  "stage_clear":
+   if victory_fly_time>=0.90:_draw_stage_clear(size)
  if state=="play":_draw_hud(size)
  if paused:
   draw_rect(Rect2(Vector2.ZERO,size),Color(0,0,0,0.72))
@@ -1045,6 +1131,112 @@ func _draw() -> void:
   _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,58),"MAIN MENU",PINK)
  if tutorial_active:_draw_overlay(size,"FLIGHT TRAINING","DRAG TO MOVE • DOUBLE TAP TO DASH",GOLD)
  if flash_time>0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
+
+
+func _stage_tile_rect(index: int,size: Vector2) -> Rect2:
+ var portrait := size.y > size.x
+ var columns := 3 if portrait else 4
+ var gap := 10.0
+ var total_width := size.x*0.90
+ var tile_width := (total_width-gap*(columns-1))/columns
+ var tile_height := clampf(size.y*0.14,62.0,124.0)
+ var row := floori(float(index)/float(columns))
+ var col := index%columns
+ var x0 := (size.x-total_width)*0.5
+ return Rect2(x0+col*(tile_width+gap),size.y*0.22+row*(tile_height+gap),tile_width,tile_height)
+
+func _dash_button_center(size: Vector2) -> Vector2:
+ return Vector2(size.x-66.0,size.y-70.0)
+
+func _draw_dash_button(size: Vector2) -> void:
+ var center := _dash_button_center(size)
+ var ready := dash_cooldown <= 0.01
+ var ratio := clampf(1.0-dash_cooldown/maxf(0.1,_ship().dash),0.0,1.0)
+ var accent := CYAN if ready else Color("#7886A8")
+ draw_circle(center,39.0,Color(0.015,0.045,0.10,0.96))
+ draw_arc(center,35.0,0.0,TAU,48,Color("#263A58"),5.0)
+ draw_arc(center,35.0,-PI/2.0,-PI/2.0+TAU*ratio,48,accent,5.0)
+ draw_arc(center,28.0,0.0,TAU,40,Color(accent,0.22),1.5)
+ _text("DASH" if ready else "%.1f" % dash_cooldown,center+Vector2(0,5),15,Color.WHITE if ready else accent)
+ _text("READY" if ready else "RECHARGE",center+Vector2(0,20),8,accent)
+
+func _draw_wingman() -> void:
+ if wingman_time <= 0.0:
+  return
+ var pos := player+Vector2(-46.0,20.0+sin(world_time*3.8)*10.0)
+ var r := float(_ship().size)*0.56
+ var accent := Color("#C6A2FF")
+ draw_circle(pos+screen_shake_offset,r*1.35,Color(accent,0.10))
+ draw_set_transform(pos+screen_shake_offset,aim_angle+PI/2.0,Vector2.ONE)
+ var shape := PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.26,-r*0.22),Vector2(r*0.82,r*0.52),Vector2(0,r*0.40),Vector2(-r*0.82,r*0.52),Vector2(-r*0.26,-r*0.22)])
+ draw_colored_polygon(shape,Color("#382954"))
+ shape.append(shape[0])
+ draw_polyline(shape,accent,2.0,true)
+ draw_colored_polygon(PackedVector2Array([Vector2(0,-r*0.68),Vector2(r*0.12,-r*0.10),Vector2(0,r*0.12),Vector2(-r*0.12,-r*0.10)]),Color("#E9DEFF"))
+ draw_set_transform(screen_shake_offset,0.0,Vector2.ONE)
+ draw_arc(pos,r*1.12,0.0,TAU,28,Color(accent,0.55),1.5)
+
+func _draw_stages(size: Vector2) -> void:
+ _button(Rect2(12,12,130,48),"BACK",GOLD)
+ _text("MISSION SELECT",Vector2(size.x*0.5,size.y*0.105),32,CYAN)
+ var cleared := max_unlocked_stage-1+int(campaign_complete)
+ _text("%d / %d MISSIONS CLEARED" % [cleared,CAMPAIGN_STAGE_COUNT],Vector2(size.x*0.5,size.y*0.165),14,GOLD)
+ for i in range(STAGE_TILE_COUNT):
+  var number := i+1
+  var rect := _stage_tile_rect(i,size)
+  var unlocked := number<=CAMPAIGN_STAGE_COUNT and number<=max_unlocked_stage
+  var complete := number<max_unlocked_stage or (number==CAMPAIGN_STAGE_COUNT and campaign_complete)
+  var accent := GREEN if complete else (CYAN if unlocked else Color("#65718A"))
+  draw_rect(Rect2(rect.position+Vector2(0,4),rect.size),Color(0.0,0.0,0.0,0.25))
+  draw_rect(rect,Color("#0C1730") if unlocked else Color("#101421"))
+  draw_rect(rect,Color(accent,0.72),false,2.0)
+  _text("MISSION %02d" % number,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.38),16,accent)
+  var status := "CLEARED" if complete else ("TAP TO DEPLOY" if unlocked else ("COMING SOON" if number>CAMPAIGN_STAGE_COUNT else "LOCKED"))
+  _text(status,Vector2(rect.position.x+rect.size.x*0.5,rect.position.y+rect.size.y*0.72),11,Color.WHITE if unlocked else Color("#78829A"))
+ _text("CLEAR THE CURRENT MISSION TO UNLOCK THE NEXT • 9–12 ARRIVE IN A FUTURE UPDATE",Vector2(size.x*0.5,size.y*0.92),10,Color("#9EADC9"))
+
+func _draw_help(size: Vector2) -> void:
+ _button(Rect2(12,12,130,48),"BACK",GOLD)
+ _text("FLIGHT SCHOOL",Vector2(size.x*0.5,size.y*0.13),34,CYAN)
+ var panel := Rect2(size.x*0.08,size.y*0.22,size.x*0.84,size.y*0.62)
+ draw_rect(panel,Color("#0A1429",0.94))
+ draw_rect(panel,Color("#315C84"),false,2.0)
+ var lines := [
+  ["STEERING","Drag anywhere on the battlefield to guide your aircraft."],
+  ["WEAPONS","Your aircraft fires automatically. Aim follows the nearest enemy."],
+  ["DASH","Tap the circular DASH control, double-tap, or use a second finger."],
+  ["POWER CORES","Collect drops for shields, repairs, overdrive and special abilities."],
+  ["SMART TARGETING","Turns your shots into homing projectiles for a limited time."],
+  ["WINGMAN ESCORT","Deploys a small support fighter that targets and fires automatically."],
+  ["CAMPAIGN","Finish a mission to unlock the next one. Your progress is saved."]
+ ]
+ var row_height := panel.size.y/float(lines.size())
+ for i in range(lines.size()):
+  var y := panel.position.y+i*row_height
+  _text(lines[i][0],Vector2(panel.position.x+panel.size.x*0.06,y+row_height*0.40),13,GOLD,false)
+  _text(lines[i][1],Vector2(panel.position.x+panel.size.x*0.06,y+row_height*0.73),11,Color("#D3E0F6"),false)
+
+func _draw_stage_clear(size: Vector2) -> void:
+ draw_rect(Rect2(Vector2.ZERO,size),Color(0.0,0.015,0.045,0.82))
+ var panel := Rect2(size.x*0.10,size.y*0.17,size.x*0.80,size.y*0.72)
+ draw_rect(Rect2(panel.position+Vector2(0,7),panel.size),Color(0.0,0.0,0.0,0.36))
+ draw_rect(panel,Color("#0B1831",0.98))
+ draw_rect(panel,GOLD,false,2.0)
+ var final_stage := stage>=CAMPAIGN_STAGE_COUNT
+ _text("CAMPAIGN COMPLETE" if final_stage else "MISSION CLEARED",Vector2(size.x*0.5,size.y*0.31),34,GOLD)
+ _text("MISSION %02d SECURED" % stage,Vector2(size.x*0.5,size.y*0.41),19,CYAN)
+ _text("SCORE %d  •  CREDITS %d" % [score,credits],Vector2(size.x*0.5,size.y*0.49),14,Color.WHITE)
+ if final_stage:
+  _text("ALL %d MISSIONS COMPLETED. MORE MISSIONS COMING SOON." % CAMPAIGN_STAGE_COUNT,Vector2(size.x*0.5,size.y*0.57),11,Color("#B8C8E5"))
+ else:
+  _text("MISSION %02d IS NOW UNLOCKED" % (stage+1),Vector2(size.x*0.5,size.y*0.55),13,GREEN)
+ if not final_stage:
+  _button(Rect2(size.x*0.18,size.y*0.60,size.x*0.64,size.y*0.085),"NEXT MISSION",GREEN)
+  _button(Rect2(size.x*0.18,size.y*0.70,size.x*0.64,size.y*0.085),"MISSION SELECT",CYAN)
+  _button(Rect2(size.x*0.18,size.y*0.80,size.x*0.64,size.y*0.085),"MAIN MENU",GOLD)
+ else:
+  _button(Rect2(size.x*0.18,size.y*0.70,size.x*0.64,size.y*0.085),"MISSION SELECT",CYAN)
+  _button(Rect2(size.x*0.18,size.y*0.80,size.x*0.64,size.y*0.085),"MAIN MENU",GOLD)
 
 func _draw_game() -> void:
  var pcol:Color=_ship().primary
@@ -1067,8 +1259,9 @@ func _draw_game() -> void:
  var target: Variant = _nearest_enemy()
  if target!=null:
   var tr:float=target.r+11.0
+  var lock_color:=Color("#72FFC2") if targeting_time>0.0 else PINK
   draw_arc(target.pos,tr,0,TAU,32,Color.WHITE,1)
-  draw_arc(target.pos,tr+4,0,TAU,32,PINK,1)
+  draw_arc(target.pos,tr+4,0,TAU,32,lock_color,2)
  for item in powerups:
   var col:Color=POWERUPS[item.kind].color
   if item.time>3.0 or int(item.time*7.0)%2==0:
@@ -1082,6 +1275,7 @@ func _draw_game() -> void:
  for popup in popups:_text(popup.text,popup.pos,16,Color(popup.color,popup.time/popup.max))
  if not (invulnerable>0.0 and int(invulnerable*14.0)%2==0):
   if not OS.has_feature("android"):draw_arc(player,58,0,TAU,32,Color(pcol,0.10),8)
+  _draw_wingman()
   _draw_player()
 
 func _draw_player() -> void:
@@ -1224,7 +1418,7 @@ func _draw_hud(size: Vector2) -> void:
   draw_rect(Rect2(bar_x,139,bar_w,8),Color("#252D4A"))
   var segment:=bar_w/float(maxi(1,total_subwaves))
   for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,141,maxf(2.0,segment-4),4),GOLD)
-  _text("CREDITS %d" % credits,Vector2(18,size.y-142),14,GOLD,false)
+  _text("CR %d" % credits,Vector2(size.x*0.78,103),12,GOLD)
  else:
   _text("SCORE %d" % score,Vector2(18,32),21,Color.WHITE,false)
   _text("%s • CR %d" % [_ship().name,credits],Vector2(18,56),13,_ship().primary,false)
@@ -1237,15 +1431,17 @@ func _draw_hud(size: Vector2) -> void:
   draw_rect(Rect2(bar_x,50,bar_w,7),Color("#252D4A"))
   var segment:=bar_w/float(maxi(1,total_subwaves))
   for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,52,maxf(2.0,segment-4),3),GOLD)
- var status_y:=size.y-136 if portrait else size.y-112
+ var status_y:=size.y-166 if portrait else size.y-145
  if shield:_text("AEGIS SHIELD",Vector2(18,status_y),13,CYAN,false);status_y+=22
  if overdrive_time>0:_text("OVERDRIVE %.1fs" % overdrive_time,Vector2(18,status_y),13,GREEN,false);status_y+=22
  if magnet_time>0:_text("MAGNET %.1fs" % magnet_time,Vector2(18,status_y),13,Color("#FFFF64"),false);status_y+=22
- if slow_time>0:_text("TIME DILATION %.1fs" % slow_time,Vector2(18,status_y),13,Color("#B4C8FF"),false)
+ if slow_time>0:_text("TIME DILATION %.1fs" % slow_time,Vector2(18,status_y),13,Color("#B4C8FF"),false);status_y+=22
+ if targeting_time>0:_text("SMART TARGETING %.1fs" % targeting_time,Vector2(18,status_y),13,Color("#72FFC2"),false);status_y+=22
+ if wingman_time>0:_text("WINGMAN %.1fs" % wingman_time,Vector2(18,status_y),13,Color("#C6A2FF"),false)
  _text("COMBO x%d" % combo,Vector2(size.x*0.5,size.y-24),16,GOLD)
  _button(Rect2(size.x-154,12,66,42),"II" if not paused else "GO",GOLD if paused else CYAN)
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
- _button(Rect2(size.x-154,size.y-102,140,82),"DASH" if dash_cooldown<=0 else "%.1fs" % dash_cooldown,CYAN if dash_cooldown<=0 else Color("#69718E"))
+ _draw_dash_button(size)
  if banner_time>0:
   _text(banner_title,Vector2(size.x*0.5,size.y*0.34 if portrait else size.y*0.20),34,CYAN)
   _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.40 if portrait else size.y*0.26),18,GOLD)
@@ -1256,8 +1452,8 @@ func _draw_menu(size: Vector2) -> void:
  var header:=Rect2(size.x*0.055,size.y*0.06,size.x*0.89,size.y*0.39)
  draw_rect(header,Color(0.025,0.065,0.15,0.86))
  draw_rect(header,Color("#2D91CD"),false,2)
- _text("NEON SURVIVOR",Vector2(size.x*0.5,size.y*0.16+sin(t*1.4)*2.5),mini(44,int(size.x*0.10)),CYAN)
- _text("SPACE COMBAT / SURVIVAL PROTOCOL",Vector2(size.x*0.5,size.y*0.24),13,Color("#96B7DC"))
+ _text("PARVAZ",Vector2(size.x*0.5,size.y*0.16+sin(t*1.4)*2.5),mini(48,int(size.x*0.12)),CYAN)
+ _text("AIR COMBAT • CAMPAIGN EDITION",Vector2(size.x*0.5,size.y*0.24),13,Color("#96B7DC"))
  var preview:=Vector2(size.x*0.5,size.y*0.335)
  draw_arc(preview,48,0,TAU,48,Color(_ship().primary,0.24),3)
  draw_arc(preview,37,0,TAU,40,Color(_ship().primary,0.12),2)
@@ -1266,12 +1462,13 @@ func _draw_menu(size: Vector2) -> void:
  var strip:=Rect2(size.x*0.08,size.y*0.465,size.x*0.84,36)
  draw_rect(strip,Color(0.04,0.09,0.17,0.95))
  draw_rect(strip,Color("#2D648E"),false,1)
- _text("BEST %d • STAGE %d • CR %d" % [high_score,best_stage,credits],Vector2(size.x*0.5,size.y*0.49),14,GOLD)
- _button(Rect2(size.x*0.18,size.y*0.53,size.x*0.64,size.y*0.09),"START MISSION",GREEN)
- _button(Rect2(size.x*0.18,size.y*0.635,size.x*0.64,size.y*0.085),"HANGAR / FLEET %d OF %d" % [unlocked_ships.size(),SHIPS.size()],GOLD)
- _button(Rect2(size.x*0.18,size.y*0.735,size.x*0.64,size.y*0.085),"SETTINGS",CYAN)
- _button(Rect2(size.x*0.18,size.y*0.835,size.x*0.64,size.y*0.085),"ACHIEVEMENTS",PURPLE)
- _text("DRAG TO MOVE • DOUBLE TAP / SECOND FINGER TO DASH",Vector2(size.x*0.5,size.y*0.95),11,Color("#879EBE"))
+ _text("CAMPAIGN %d/%d CLEARED • BEST %d • CR %d" % [max_unlocked_stage-1+int(campaign_complete),CAMPAIGN_STAGE_COUNT,best_stage,credits],Vector2(size.x*0.5,size.y*0.49),14,GOLD)
+ _button(Rect2(size.x*0.18,size.y*0.535,size.x*0.64,size.y*0.082),"CAMPAIGN / LEVEL SELECT",GREEN)
+ _button(Rect2(size.x*0.18,size.y*0.617,size.x*0.64,size.y*0.082),"HANGAR • FLEET %d/%d" % [unlocked_ships.size(),SHIPS.size()],GOLD)
+ _button(Rect2(size.x*0.18,size.y*0.699,size.x*0.64,size.y*0.082),"SETTINGS",CYAN)
+ _button(Rect2(size.x*0.18,size.y*0.781,size.x*0.64,size.y*0.082),"FLIGHT SCHOOL / HELP",PURPLE)
+ _button(Rect2(size.x*0.18,size.y*0.863,size.x*0.64,size.y*0.082),"ACHIEVEMENTS",Color("#8E9BFF"))
+ _text("DRAG TO STEER • AUTO FIRE • TAP DASH",Vector2(size.x*0.5,size.y*0.95),11,Color("#879EBE"))
  _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
 
 func _draw_hangar(size: Vector2) -> void:
@@ -1279,9 +1476,9 @@ func _draw_hangar(size: Vector2) -> void:
  _text("FLEET HANGAR",Vector2(size.x*0.5,size.y*0.10),36,CYAN)
  _text("CREDITS %d • TAP TO EQUIP OR UNLOCK" % credits,Vector2(size.x*0.5,size.y*0.16),12,GOLD)
  _button(Rect2(12,12,130,48),"BACK",GOLD)
- var columns:=2 if size.x<650 else 5
+ var columns:=2 if size.x<650 else 4
  var card_width:=size.x/columns
- var card_height:=size.y*0.52 if size.x>=650 else size.y*0.23
+ var card_height:=size.y*0.17 if size.x<650 else size.y*0.37
  var top:=size.y*0.20
  for i in range(SHIPS.size()):
   var ship:Dictionary=SHIPS[i]
@@ -1308,6 +1505,8 @@ func _draw_ship_icon(pos: Vector2,color: Color,r: int,ship_id: String="viper") -
   "valkyrie":shape=PackedVector2Array([Vector2(0,-r*1.25),Vector2(r*0.3,-r*0.25),Vector2(r*1.1,r*0.25),Vector2(r*0.8,r*0.55),Vector2(r*0.38,r*0.35),Vector2(0,r*0.7),Vector2(-r*0.38,r*0.35),Vector2(-r*0.8,r*0.55),Vector2(-r*1.1,r*0.25),Vector2(-r*0.3,-r*0.25)])
   "phantom":shape=PackedVector2Array([Vector2(0,-r*1.4),Vector2(r*0.18,r*0.55),Vector2(r*0.85,r*0.35),Vector2(r*0.45,r*0.72),Vector2(0,r*0.4),Vector2(-r*0.45,r*0.72),Vector2(-r*0.85,r*0.35),Vector2(-r*0.18,r*0.55)])
   "titan":shape=PackedVector2Array([Vector2(0,-r*1.2),Vector2(r*0.4,-r*0.25),Vector2(r*1.25,r*0.5),Vector2(r*0.9,r*0.85),Vector2(r*0.35,r*0.55),Vector2(0,r*0.75),Vector2(-r*0.35,r*0.55),Vector2(-r*0.9,r*0.85),Vector2(-r*1.25,r*0.5),Vector2(-r*0.4,-r*0.25)])
+ if shape.is_empty():
+  shape=PackedVector2Array([Vector2(0,-r*1.3),Vector2(r*0.25,-r*0.25),Vector2(r*1.0,r*0.45),Vector2(r*0.6,r*0.55),Vector2(0,r*0.35),Vector2(-r*0.6,r*0.55),Vector2(-r*1.0,r*0.45),Vector2(-r*0.25,-r*0.25)])
  draw_set_transform(pos,0,Vector2.ONE)
  draw_colored_polygon(shape,color)
  shape.append(shape[0])
