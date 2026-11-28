@@ -53,6 +53,8 @@ var ui_theme: Theme
 var ui_signature := ""
 var dash_ui_button: Button
 var language := "fa"
+var settings_return_state := "menu"
+var settings_return_paused := false
 var viewport_size := Vector2(540,960)
 var background_gradient: GradientTexture2D
 var state := "menu"
@@ -1045,6 +1047,9 @@ func _ui_button(parent: Control,label_text: String,accent: Color=CYAN,height: fl
  button.focus_mode=Control.FOCUS_NONE
  button.disabled=disabled
  button.clip_text=false
+ button.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button.text_direction=Control.TEXT_DIRECTION_AUTO
+ button.alignment=HORIZONTAL_ALIGNMENT_CENTER
  button.add_theme_font_size_override("font_size",21)
  button.add_theme_color_override("font_color",Color("#F4F7FF"))
  button.add_theme_color_override("font_hover_color",Color.WHITE)
@@ -1135,9 +1140,13 @@ func _ui_screen(title: String,subtitle: String="",show_back: bool=true) -> VBoxC
  return content
 
 func _ui_back() -> void:
- if state=="achievements":state=achievements_return_state
+ if state=="settings":
+  _save()
+  state=settings_return_state
+  paused=settings_return_paused
+  if state=="play" and not paused and not muted and sound_bank!=null:sound_bank.start_music()
+ elif state=="achievements":state=achievements_return_state
  else:state="menu"
- paused=false
  _refresh_ui(true)
  queue_redraw()
 
@@ -1164,6 +1173,9 @@ func _ui_open_hangar() -> void:
  _refresh_ui(true)
 
 func _ui_open_settings() -> void:
+ settings_return_state=state
+ settings_return_paused=paused
+ _save()
  state="settings"
  _refresh_ui(true)
 
@@ -1381,7 +1393,7 @@ func _build_achievements_ui() -> void:
 func _build_game_controls_ui() -> void:
  var pause_button:=_ui_button(ui_root,"Ⅱ",GOLD,68,Callable(self,"_ui_toggle_pause"))
  pause_button.name="PauseButton"
- pause_button.position=Vector2(viewport_size.x-86.0,18.0)
+ pause_button.position=Vector2(viewport_size.x-86.0,116.0)
  pause_button.size=Vector2(68.0,68.0)
  pause_button.custom_minimum_size=Vector2(68.0,68.0)
  pause_button.add_theme_font_size_override("font_size",26)
@@ -1452,8 +1464,11 @@ func _build_pause_overlay_ui() -> void:
  _ui_button(body,_loc("بازگشت به منو","MAIN MENU"),PINK,72,Callable(self,"_ui_exit_to_menu"))
 
 func _ui_open_settings_from_pause() -> void:
- paused=false
+ settings_return_state="play"
+ settings_return_paused=true
+ paused=true
  state="settings"
+ _save()
  _refresh_ui(true)
 
 func _ui_restart_stage() -> void:
