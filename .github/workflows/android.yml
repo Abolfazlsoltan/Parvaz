@@ -145,6 +145,16 @@ jobs:
           fi
           echo "Main scene started successfully for 12 frames."
 
+      - name: Run native UI and localization smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot --script res://tests/mobile_ui_smoke.gd --verbose 2>&1 | tee "$RUNNER_TEMP/godot-ui-test.log"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR:' "$RUNNER_TEMP/godot-ui-test.log"; then
+            echo "Native UI smoke test reported an engine or script error."
+            exit 1
+          fi
+
       - name: Export Android APK
         shell: bash
         env:
@@ -163,6 +173,11 @@ jobs:
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump permissions "$APK" | tee "$RUNNER_TEMP/android-permissions.txt"
+          if grep -Eq 'android\.permission\.(CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA|VIBRATE|INTERNET|WAKE_LOCK)' "$RUNNER_TEMP/android-permissions.txt"; then
+            echo "APK contains an unnecessary runtime or network permission."
+            exit 1
+          fi
           ls -lh "$APK"
 
       - name: Upload validated APK

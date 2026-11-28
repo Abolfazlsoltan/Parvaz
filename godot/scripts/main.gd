@@ -47,7 +47,15 @@ const POWERUPS := {"shield":{"color":Color8(65,230,255),"symbol":"S","label":"AE
 
 var rng := RandomNumberGenerator.new()
 var sound_bank: Node
-var viewport_size := Vector2(960,540)
+var ui_layer: CanvasLayer
+var ui_root: Control
+var ui_theme: Theme
+var ui_signature := ""
+var dash_ui_button: Button
+var language := "fa"
+var settings_return_state := "menu"
+var settings_return_paused := false
+var viewport_size := Vector2(540,960)
 var background_gradient: GradientTexture2D
 var state := "menu"
 var achievements_return_state := "menu"
@@ -145,12 +153,14 @@ func _ready() -> void:
  add_child(sound_bank)
  viewport_size = get_viewport_rect().size
  _load_save()
+ _setup_ui()
  Engine.max_fps=target_fps
  _sync_audio()
  _create_stars()
  _build_background_gradient()
  _reset_run()
  get_viewport().size_changed.connect(_resize)
+ _refresh_ui(true)
  queue_redraw()
 
 func _notification(what: int) -> void:
@@ -225,6 +235,8 @@ func _load_save() -> void:
   return
  high_score = maxi(0,int(data.get("hi",0)))
  best_stage = maxi(1,int(data.get("best_stage",1)))
+ language = str(data.get("language","fa"))
+ if language not in ["fa","en"]:language="fa"
  max_unlocked_stage = clampi(int(data.get("max_unlocked_stage",mini(best_stage,CAMPAIGN_STAGE_COUNT))),1,CAMPAIGN_STAGE_COUNT)
  selected_stage = clampi(int(data.get("selected_stage",1)),1,max_unlocked_stage)
  campaign_complete = data.get("campaign_complete",false) == true
@@ -257,7 +269,7 @@ func _load_save() -> void:
 
 func _save() -> void:
  _sync_audio()
- var data := {"hi":high_score,"best_stage":best_stage,"max_unlocked_stage":max_unlocked_stage,"selected_stage":selected_stage,"campaign_complete":campaign_complete,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
+ var data := {"hi":high_score,"best_stage":best_stage,"language":language,"max_unlocked_stage":max_unlocked_stage,"selected_stage":selected_stage,"campaign_complete":campaign_complete,"target_fps":target_fps,"credits":credits,"unlocked_ships":unlocked_ships,"selected_ship":selected_ship,"muted":muted,"sfx_volume":sfx_volume,"music_volume":music_volume,"difficulty":difficulty,"tutorial_done":tutorial_done,"achievements":achievements,"total_kills":total_kills,"total_runs":total_runs,"total_playtime":total_playtime,"bosses_defeated":bosses_defeated}
  # Atomic-style temp save, mirroring the Python game's write-then-replace persistence.
  var temp_path:=SAVE_PATH+".tmp"
  var file:=FileAccess.open(temp_path,FileAccess.WRITE)
@@ -352,6 +364,12 @@ func _start_stage(number: int) -> void:
 func _announce(title: String, subtitle: String) -> void:
  banner_title = title
  banner_subtitle = subtitle
+ if language=="fa":
+  if title.begins_with("STAGE "):banner_title="مرحلهٔ "+_fa_number(int(title.trim_prefix("STAGE ")))
+  if subtitle.begins_with("SUB-WAVE "):
+   var wave_text:=subtitle.trim_prefix("SUB-WAVE ").split(" / ")
+   banner_subtitle="موج "+_fa_number(int(wave_text[0]))+" از "+_fa_number(int(wave_text[1]))
+  elif subtitle=="BOSS SQUADRON!":banner_subtitle="گروه فرماندهی دشمن"
  banner_time = 2.1
 
 func _spawn_subwave() -> void:
@@ -439,7 +457,11 @@ func _spawn_powerup(pos: Vector2,kind: String="") -> void:
  powerups.append({"pos":pos,"vel":Vector2(0,58),"kind":kind,"time":11.0})
 
 func _popup(pos: Vector2,text: String,color: Color=GOLD) -> void:
- popups.append({"pos":pos,"text":text,"color":color,"time":0.85,"max":0.85})
+ var shown_text:=text
+ if language=="fa":
+  if text.begins_with("UNLOCKED: "):shown_text="جنگندهٔ جدید: "+text.trim_prefix("UNLOCKED: ")
+  elif text.begins_with("ACHIEVEMENT: "):shown_text="دستاورد: "+text.trim_prefix("ACHIEVEMENT: ")
+ popups.append({"pos":pos,"text":shown_text,"color":color,"time":0.85,"max":0.85})
 
 func _shockwave(pos: Vector2,color: Color,max_radius: float=95.0) -> void:
  shockwaves.append({"pos":pos,"radius":10.0,"max_radius":max_radius,"color":color,"time":0.36,"max":0.36})
@@ -466,7 +488,6 @@ func _trigger_dash() -> void:
  if sound_bank!=null:sound_bank.play_sfx("dash")
  _shockwave(player,_ship().primary,80)
  _burst(player,_ship().primary,26,410,0.42)
- if OS.has_feature("android"):Input.vibrate_handheld(22)
  _check_achievements()
 
 func _hurt_player() -> void:
@@ -479,7 +500,6 @@ func _hurt_player() -> void:
  if sound_bank!=null:sound_bank.play_sfx("hurt")
  _shockwave(player,PINK,115)
  _burst(player,PINK,42,460,0.85,4.2)
- if OS.has_feature("android"):Input.vibrate_handheld(35)
  if hp <= 0:
   state = "over"
   tutorial_active = false
@@ -575,6 +595,9 @@ func _enemy_shoot(enemy: Dictionary,angle: float,speed: float,radius: float,life
   enemy_bullets.append({"pos":enemy.pos,"vel":Vector2(cos(angle),sin(angle))*speed,"life":life,"radius":radius})
 
 func _process(delta: float) -> void:
+ _refresh_ui()
+ if is_instance_valid(dash_ui_button):
+  dash_ui_button.text=_loc("شتاب\nآماده" if dash_cooldown<=0.01 else "شارژ\n%s" % _fa_decimal(dash_cooldown),"DASH\nREADY" if dash_cooldown<=0.01 else "RECHARGE\n%.1fs" % dash_cooldown)
  var dt := minf(delta,0.033)
  touch_ripple_time=maxf(0.0,touch_ripple_time-dt)
  for star in stars:
@@ -774,11 +797,10 @@ func _process(delta: float) -> void:
    item.time=0.0
    var kind:String=item.kind
    if sound_bank!=null:sound_bank.play_sfx("powerup")
-   _popup(player+Vector2(0,-28),POWERUPS[kind].label,POWERUPS[kind].color)
+   _popup(player+Vector2(0,-28),_powerup_label(kind),POWERUPS[kind].color)
    _shockwave(player,POWERUPS[kind].color,95)
    _burst(player,POWERUPS[kind].color,28,360,0.6)
    powerups_collected+=1
-   if OS.has_feature("android"):Input.vibrate_handheld(16)
    match kind:
     "shield":shield=true
     "overdrive":overdrive_time=10.0
@@ -877,220 +899,624 @@ func _check_achievements() -> void:
      break
  _save()
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
  if event is InputEventKey and event.pressed and not event.echo:
-  if event.keycode==KEY_ESCAPE or event.keycode==KEY_P:
-   if state=="play":paused=not paused
-   elif state!="menu":state="menu"
-  elif event.keycode==KEY_SPACE:dash_requested=true
- if event is InputEventScreenTouch:
-  if event.pressed:_pointer_down(event.position,event.index)
-  else:_pointer_up(event.index)
- elif event is InputEventScreenDrag and event.index==drag_id:
-  if active_slider!="":_update_slider(active_slider,event.position.x)
-  else:
-   drag_delta+=event.position-last_drag
-   last_drag=event.position
- elif event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
-  if event.pressed:_pointer_down(event.position,-2)
-  else:_pointer_up(-2)
- elif event is InputEventMouseMotion and mouse_drag:
-  if active_slider!="":_update_slider(active_slider,event.position.x)
-  else:
-   drag_delta+=event.position-last_drag
-   last_drag=event.position
-
-func _pointer_down(pos: Vector2,id: int) -> void:
- if state=="play" and tutorial_active:
-  tutorial_active=false
-  tutorial_done=true
-  _save()
-  return
- if state=="settings" and ((pos.y>=viewport_size.y*0.80 and pos.y<=viewport_size.y*0.85) or (pos.y>=viewport_size.y*0.90 and pos.y<=viewport_size.y*0.95)):
-  active_slider="sfx" if pos.y<viewport_size.y*0.87 else "music"
-  slider_pointer_id=id
-  drag_id=id
-  mouse_drag=id==-2
-  _update_slider(active_slider,pos.x)
-  return
- if state=="play":
-  touch_ripple_pos=pos
-  touch_ripple_time=0.25
-  var w:=viewport_size.x
-  var h:=viewport_size.y
-  var mute_rect:=Rect2(w-78,12,66,42)
-  var pause_rect:=Rect2(w-154,12,66,42)
-  if mute_rect.has_point(pos):
-   muted=not muted
-   _sync_audio()
-   if not muted and not paused and sound_bank!=null:sound_bank.start_music()
-   _save()
-   return
-  if pause_rect.has_point(pos):
-   paused=not paused
-   return
-  if paused:
-   if Rect2(w*0.2,h*0.43,w*0.6,58).has_point(pos):
-    paused=false
-   elif Rect2(w*0.2,h*0.54,w*0.6,58).has_point(pos):
-    _start_run()
-   elif Rect2(w*0.2,h*0.65,w*0.6,58).has_point(pos):
-    paused=false
+  if event.keycode==KEY_ESCAPE or event.keycode==KEY_BACK:
+   if state=="play":
+    paused=not paused
+   elif state!="menu":
     state="menu"
-    if sound_bank!=null:sound_bank.stop_music()
+    paused=false
+   _refresh_ui(true)
    return
-  if pos.distance_to(_dash_button_center(viewport_size))<=43.0:
+  if event.keycode==KEY_SPACE and state=="play" and not paused and not tutorial_active:
    dash_requested=true
    return
-  # Faithful mobile touch behavior: second finger or a quick double tap triggers dash.
-  if id!=-2:
-   if drag_id!=-1 and id!=drag_id:
-    dash_requested=true
-    return
-   var now:=Time.get_ticks_msec()
-   if now-last_touch_ms<320 and pos.distance_to(last_touch_pos)<120.0:
-    dash_requested=true
-    last_touch_ms=0
+ if state!="play" or paused or tutorial_active:
+  return
+ if OS.has_feature("android"):
+  if event is InputEventScreenTouch:
+   if event.pressed:
+    _game_touch_down(event.position,event.index,event.double_tap)
    else:
-    last_touch_ms=now
-    last_touch_pos=pos
-  drag_id=id
-  mouse_drag=id==-2
-  last_drag=pos
+    _game_touch_up(event.index)
+  elif event is InputEventScreenDrag and event.index==drag_id:
+   drag_delta+=event.position-last_drag
+   last_drag=event.position
  else:
-  _click_ui(pos)
+  if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+   if event.pressed:
+    _game_touch_down(event.position,-2,false)
+   else:
+    _game_touch_up(-2)
+  elif event is InputEventMouseMotion and mouse_drag:
+   drag_delta+=event.position-last_drag
+   last_drag=event.position
 
-func _pointer_up(id: int) -> void:
- if id==drag_id:drag_id=-1
- if id==slider_pointer_id:
-  active_slider=""
-  slider_pointer_id=-1
-  _save()
+func _game_touch_down(pos: Vector2,id: int,double_tap: bool=false) -> void:
+ if id!=-2 and double_tap:
+  dash_requested=true
+  return
+ if drag_id!=-1 and drag_id!=id:
+  return
+ touch_ripple_pos=pos
+ touch_ripple_time=0.18
+ drag_id=id
+ mouse_drag=id==-2
+ last_drag=pos
+
+func _game_touch_up(id: int) -> void:
+ if drag_id==id:drag_id=-1
  if id==-2:mouse_drag=false
 
-func _update_slider(which: String,x: float) -> void:
- var w:=viewport_size.x
- var value:=clampf((x-w*0.2)/(w*0.6),0.0,1.0)
- if which=="sfx":sfx_volume=value
- else:music_volume=value
+
+func _loc(fa_text: String,en_text: String) -> String:
+ return fa_text if language=="fa" else en_text
+
+func _fa_number(value: Variant) -> String:
+ var result:=str(value)
+ var western:="0123456789"
+ var persian:="۰۱۲۳۴۵۶۷۸۹"
+ for i in range(10):
+  result=result.replace(western.substr(i,1),persian.substr(i,1))
+ return result
+
+func _fa_decimal(value: float) -> String:
+ return _fa_number("%.1f" % value).replace(".", "٫")
+
+func _powerup_label(kind: String) -> String:
+ var labels:Dictionary={
+  "shield":["سپر محافظ","AEGIS SHIELD"],
+  "overdrive":["افزایش قدرت شلیک","WEAPON OVERDRIVE"],
+  "morph":["تغییر جنگنده","SHIP MORPH CORE"],
+  "repair":["تعمیر بدنه","HULL REPAIR"],
+  "nuke":["موج الکترومغناطیسی","EMP NOVA"],
+  "magnet":["جذب جایزه‌ها","MAGNET PULSE"],
+  "slow":["کندسازی زمان","TIME DILATION"],
+  "targeting":["هدف‌گیری هوشمند","SMART TARGETING"],
+  "wingman":["جنگندهٔ کمکی","WINGMAN ESCORT"]
+ }
+ if not labels.has(kind):return kind
+ return labels[kind][0] if language=="fa" else labels[kind][1]
+
+func _setup_ui() -> void:
+ ui_layer=CanvasLayer.new()
+ ui_layer.layer=20
+ add_child(ui_layer)
+ ui_root=Control.new()
+ ui_root.name="MobileUI"
+ ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ ui_root.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ ui_layer.add_child(ui_root)
+ ui_theme=Theme.new()
+ ui_theme.default_font=ThemeDB.fallback_font
+ ui_theme.default_font_size=22
+ ui_root.theme=ui_theme
+ _set_ui_direction()
+
+func _set_ui_direction() -> void:
+ if not is_instance_valid(ui_root):return
+ ui_root.layout_direction=Control.LAYOUT_DIRECTION_RTL if language=="fa" else Control.LAYOUT_DIRECTION_LTR
+
+func _ui_signature() -> String:
+ return "%s|%s|%s|%s|%s" % [state,str(paused),str(tutorial_active),language,str(victory_fly_time>=0.90)]
+
+func _refresh_ui(force: bool=false) -> void:
+ if not is_instance_valid(ui_root):return
+ var signature:=_ui_signature()
+ if not force and signature==ui_signature:return
+ ui_signature=signature
+ for child in ui_root.get_children():
+  ui_root.remove_child(child)
+  child.queue_free()
+ dash_ui_button=null
+ _set_ui_direction()
+ match state:
+  "menu":_build_menu_ui()
+  "stages":_build_stages_ui()
+  "hangar":_build_hangar_ui()
+  "settings":_build_settings_ui()
+  "help":_build_help_ui()
+  "achievements":_build_achievements_ui()
+  "over":_build_game_over_ui()
+  "stage_clear":
+   if victory_fly_time>=0.90:_build_stage_clear_ui()
+  "play":
+   _build_game_controls_ui()
+   if paused:_build_pause_overlay_ui()
+   elif tutorial_active:_build_tutorial_overlay_ui()
+
+func _ui_style(accent: Color=Color("#2B78A8"),background: Color=Color("#10233D"),radius: int=18) -> StyleBoxFlat:
+ var style:=StyleBoxFlat.new()
+ style.bg_color=background
+ style.border_color=accent
+ style.set_border_width_all(2)
+ style.set_corner_radius_all(radius)
+ style.content_margin_left=16
+ style.content_margin_right=16
+ style.content_margin_top=12
+ style.content_margin_bottom=12
+ return style
+
+func _ui_button(parent: Control,label_text: String,accent: Color=CYAN,height: float=68,action: Callable=Callable(),disabled: bool=false) -> Button:
+ var button:=Button.new()
+ button.text=label_text
+ button.custom_minimum_size=Vector2(0,height)
+ button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ button.focus_mode=Control.FOCUS_NONE
+ button.disabled=disabled
+ button.clip_text=false
+ button.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button.text_direction=Control.TEXT_DIRECTION_AUTO
+ button.alignment=HORIZONTAL_ALIGNMENT_CENTER
+ button.add_theme_font_size_override("font_size",21)
+ button.add_theme_color_override("font_color",Color("#F4F7FF"))
+ button.add_theme_color_override("font_hover_color",Color.WHITE)
+ button.add_theme_color_override("font_pressed_color",Color.WHITE)
+ button.add_theme_color_override("font_disabled_color",Color("#77839A"))
+ button.add_theme_stylebox_override("normal",_ui_style(accent,Color("#142844")))
+ button.add_theme_stylebox_override("hover",_ui_style(accent.lightened(0.14),Color("#203B5D")))
+ button.add_theme_stylebox_override("pressed",_ui_style(accent.darkened(0.14),Color("#0A172C")))
+ button.add_theme_stylebox_override("disabled",_ui_style(Color("#3D4658"),Color("#121A29")))
+ button.add_theme_stylebox_override("focus",_ui_style(accent,Color("#142844")))
+ parent.add_child(button)
+ if action.is_valid():
+  button.pressed.connect(action)
+ return button
+
+func _ui_label(parent: Control,label_text: String,font_size: int=21,color: Color=Color("#ECF4FF"),centered: bool=false) -> Label:
+ var label:=Label.new()
+ label.text=label_text
+ label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER if centered else (HORIZONTAL_ALIGNMENT_RIGHT if language=="fa" else HORIZONTAL_ALIGNMENT_LEFT)
+ label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+ label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label.text_direction=Control.TEXT_DIRECTION_AUTO
+ label.add_theme_font_size_override("font_size",font_size)
+ label.add_theme_color_override("font_color",color)
+ label.add_theme_color_override("font_shadow_color",Color(0,0,0,0.45))
+ label.add_theme_constant_override("shadow_offset_x",1)
+ label.add_theme_constant_override("shadow_offset_y",1)
+ parent.add_child(label)
+ return label
+
+func _ui_card(parent: Control,accent: Color=Color("#31577D")) -> VBoxContainer:
+ var panel:=PanelContainer.new()
+ panel.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ panel.add_theme_stylebox_override("panel",_ui_style(accent,Color("#10223B"),18))
+ parent.add_child(panel)
+ var margins:=MarginContainer.new()
+ margins.add_theme_constant_override("margin_left",10)
+ margins.add_theme_constant_override("margin_right",10)
+ margins.add_theme_constant_override("margin_top",8)
+ margins.add_theme_constant_override("margin_bottom",8)
+ panel.add_child(margins)
+ var body:=VBoxContainer.new()
+ body.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ body.add_theme_constant_override("separation",8)
+ margins.add_child(body)
+ return body
+
+func _ui_screen(title: String,subtitle: String="",show_back: bool=true) -> VBoxContainer:
+ var shade:=ColorRect.new()
+ shade.color=Color(0.015,0.025,0.055,0.88)
+ shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ shade.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ ui_root.add_child(shade)
+ var margins:=MarginContainer.new()
+ margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ margins.add_theme_constant_override("margin_left",14)
+ margins.add_theme_constant_override("margin_right",14)
+ margins.add_theme_constant_override("margin_top",16)
+ margins.add_theme_constant_override("margin_bottom",16)
+ ui_root.add_child(margins)
+ var outer:=PanelContainer.new()
+ outer.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ outer.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ outer.add_theme_stylebox_override("panel",_ui_style(Color("#285C88"),Color("#08162B"),24))
+ margins.add_child(outer)
+ var scroll:=ScrollContainer.new()
+ scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+ scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+ outer.add_child(scroll)
+ var inner:=MarginContainer.new()
+ inner.add_theme_constant_override("margin_left",12)
+ inner.add_theme_constant_override("margin_right",12)
+ inner.add_theme_constant_override("margin_top",12)
+ inner.add_theme_constant_override("margin_bottom",12)
+ inner.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ scroll.add_child(inner)
+ var content:=VBoxContainer.new()
+ content.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ content.add_theme_constant_override("separation",14)
+ inner.add_child(content)
+ if show_back:
+  _ui_button(content,_loc("‹  بازگشت","‹  BACK"),Color("#6486AA"),58,Callable(self,"_ui_back"))
+ _ui_label(content,title,34,CYAN,true)
+ if subtitle!="":_ui_label(content,subtitle,18,Color("#AFC5E3"),true)
+ return content
+
+func _ui_back() -> void:
+ if state=="settings":
+  _save()
+  state=settings_return_state
+  paused=settings_return_paused
+  if state=="play" and not paused and not muted and sound_bank!=null:sound_bank.start_music()
+ elif state=="achievements":state=achievements_return_state
+ else:state="menu"
+ _refresh_ui(true)
+ queue_redraw()
+
+func _build_menu_ui() -> void:
+ var content:=_ui_screen("پرواز","نبرد هوایی  •  کمپین مرحله‌ای",false)
+ _ui_label(content,_loc("جنگندهٔ فعال: ","ACTIVE FIGHTER: ")+str(_ship().name),18,_ship().primary,true)
+ var summary:=_ui_card(content,GOLD)
+ _ui_label(summary,_loc("پیشرفت کمپین","CAMPAIGN PROGRESS"),19,GOLD,true)
+ _ui_label(summary,_loc("%s از ۸ مرحله باز است" % _fa_number(max_unlocked_stage),"%d of 8 missions unlocked" % max_unlocked_stage),23,Color.WHITE,true)
+ _ui_label(summary,_loc("رکورد: %s   اعتبار: %s" % [_fa_number(high_score),_fa_number(credits)],"RECORD: %d   CREDITS: %d" % [high_score,credits]),17,Color("#C5D6EB"),true)
+ _ui_button(content,_loc("انتخاب مرحله و شروع","CAMPAIGN / PLAY"),GREEN,78,Callable(self,"_ui_open_stages"))
+ _ui_button(content,_loc("آشیانهٔ هواپیماها","AIRCRAFT HANGAR"),GOLD,72,Callable(self,"_ui_open_hangar"))
+ _ui_button(content,_loc("تنظیمات","SETTINGS"),CYAN,72,Callable(self,"_ui_open_settings"))
+ _ui_button(content,_loc("آموزش و راهنما","FLIGHT SCHOOL"),PURPLE,72,Callable(self,"_ui_open_help"))
+ _ui_button(content,_loc("دستاوردها","ACHIEVEMENTS"),Color("#91A2FF"),72,Callable(self,"_ui_open_achievements"))
+ _ui_label(content,_loc("برای حرکت، صفحه را بکشید؛ شلیک خودکار است.","DRAG TO STEER • WEAPONS FIRE AUTOMATICALLY"),16,Color("#94A8C8"),true)
+
+func _ui_open_stages() -> void:
+ state="stages"
+ _refresh_ui(true)
+
+func _ui_open_hangar() -> void:
+ state="hangar"
+ _refresh_ui(true)
+
+func _ui_open_settings() -> void:
+ settings_return_state=state
+ settings_return_paused=paused
+ _save()
+ state="settings"
+ _refresh_ui(true)
+
+func _ui_open_help() -> void:
+ state="help"
+ _refresh_ui(true)
+
+func _ui_open_achievements() -> void:
+ achievements_return_state="menu"
+ state="achievements"
+ _refresh_ui(true)
+
+func _ui_start_stage(number: int) -> void:
+ if number<=max_unlocked_stage and number<=CAMPAIGN_STAGE_COUNT:
+  selected_stage=number
+  _start_run(number)
+  _refresh_ui(true)
+
+func _build_stages_ui() -> void:
+ var content:=_ui_screen(_loc("انتخاب مرحله","MISSION SELECT"),_loc("با تکمیل هر مرحله، مرحلهٔ بعدی باز می‌شود.","COMPLETE A MISSION TO UNLOCK THE NEXT."))
+ var progress:=_ui_card(content,GOLD)
+ _ui_label(progress,_loc("%s از ۸ مرحله باز شده" % _fa_number(max_unlocked_stage),"%d / 8 MISSIONS UNLOCKED" % max_unlocked_stage),20,GOLD,true)
+ var grid:=GridContainer.new()
+ grid.columns=2 if viewport_size.y>=viewport_size.x else 4
+ grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ grid.add_theme_constant_override("h_separation",10)
+ grid.add_theme_constant_override("v_separation",10)
+ content.add_child(grid)
+ for i in range(STAGE_TILE_COUNT):
+  var number:=i+1
+  var available:=number<=CAMPAIGN_STAGE_COUNT and number<=max_unlocked_stage
+  var complete:=number<max_unlocked_stage or (number==CAMPAIGN_STAGE_COUNT and campaign_complete)
+  var label:=_loc("مرحلهٔ %s" % _fa_number(number),"MISSION %02d" % number)
+  if complete:label+="\n"+_loc("تکمیل‌شده","CLEARED")
+  elif available:label+="\n"+_loc("آمادهٔ پرواز","READY")
+  elif number<=CAMPAIGN_STAGE_COUNT:label+="\n"+_loc("قفل","LOCKED")
+  else:label+="\n"+_loc("در به‌روزرسانی آینده","COMING SOON")
+  var accent:=GREEN if complete else (CYAN if available else Color("#59657B"))
+  _ui_button(grid,label,accent,118,Callable(self,"_ui_start_stage").bind(number),not available)
+
+func _ui_select_ship(id: String) -> void:
+ if unlocked_ships.has(id):
+  _equip_ship(id)
+ _save()
+ _refresh_ui(true)
+
+func _ship_description(id: String) -> String:
+ var descriptions:Dictionary={
+  "viper":["شلیک دوتایی متعادل","Balanced twin fire"],
+  "interceptor":["شلیک سه‌جهته و شتاب سریع","Three-way spread and quick dash"],
+  "valkyrie":["موشک‌های خودهدایت‌شونده","Homing missiles"],
+  "phantom":["شلیک نفوذکننده","Piercing shots"],
+  "titan":["زره سنگین و شلیک پنج‌گانه","Heavy armor and five-way fire"],
+  "raptor":["شلیک سه‌مسیرهٔ سریع","Fast three-lane volley"],
+  "nova":["پالس پرقدرت نفوذکننده","High-power piercing pulse"],
+  "oracle":["موشک‌های جست‌وجوگر","Autonomous seeker missiles"]
+ }
+ if not descriptions.has(id):return ""
+ return descriptions[id][0] if language=="fa" else descriptions[id][1]
+
+func _build_hangar_ui() -> void:
+ var content:=_ui_screen(_loc("آشیانهٔ هواپیماها","AIRCRAFT HANGAR"),_loc("برای انتخاب جنگنده، کارت آن را لمس کنید.","TAP AN AIRCRAFT CARD TO EQUIP IT."))
+ var balance:=_ui_card(content,GOLD)
+ _ui_label(balance,_loc("اعتبار: %s" % _fa_number(credits),"CREDITS: %d" % credits),20,GOLD,true)
+ var grid:=GridContainer.new()
+ grid.columns=2 if viewport_size.y>=viewport_size.x else 4
+ grid.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ grid.add_theme_constant_override("h_separation",10)
+ grid.add_theme_constant_override("v_separation",10)
+ content.add_child(grid)
+ for ship in SHIPS:
+  var unlocked: bool = unlocked_ships.has(str(ship.id))
+  var selected: bool = selected_ship==str(ship.id)
+  var status:=_loc("انتخاب شده","EQUIPPED") if selected else (_loc("در دسترس","UNLOCKED") if unlocked else _loc("پس از مرحلهٔ %s" % _fa_number(ship.stage),"UNLOCK AT MISSION %d" % ship.stage))
+  var caption:=str(ship.name)+"\n"+_loc("زره %s  •  قدرت %s٪" % [_fa_number(ship.hp),_fa_number(int(ship.damage*100))],"ARMOR %d  •  DAMAGE %d%%" % [ship.hp,int(ship.damage*100)])+"\n"+_ship_description(str(ship.id))+"\n"+status
+  _ui_button(grid,caption,ship.primary if unlocked else Color("#65738A"),154,Callable(self,"_ui_select_ship").bind(str(ship.id)),not unlocked)
+
+func _ui_set_language(value: String) -> void:
+ language=value if value in ["fa","en"] else "fa"
+ _save()
+ _refresh_ui(true)
+
+func _ui_toggle_mute() -> void:
+ muted=not muted
+ _sync_audio()
+ if not muted and state=="play" and not paused and sound_bank!=null:sound_bank.start_music()
+ _save()
+ _refresh_ui(true)
+
+func _ui_set_sfx(value: float) -> void:
+ sfx_volume=clampf(value,0.0,1.0)
  _sync_audio()
 
-func _click_ui(pos: Vector2) -> void:
- if sound_bank!=null:sound_bank.play_sfx("menu_select")
- var w:=viewport_size.x
- var h:=viewport_size.y
- if state!="play" and Rect2(w-78,12,66,42).has_point(pos):
-  muted=not muted
-  _sync_audio()
-  if not muted and sound_bank!=null:sound_bank.start_music()
+func _ui_set_music(value: float) -> void:
+ music_volume=clampf(value,0.0,1.0)
+ _sync_audio()
+
+func _ui_set_difficulty(value: String) -> void:
+ if DIFFICULTIES.has(value):
+  difficulty=value
   _save()
-  return
- if state=="settings" and pos.y>=h*0.80 and pos.y<=h*0.85:
-  sfx_volume=clampf((pos.x-w*0.2)/(w*0.6),0.0,1.0)
-  _save()
-  return
- if state=="settings" and pos.y>=h*0.90 and pos.y<=h*0.95:
-  music_volume=clampf((pos.x-w*0.2)/(w*0.6),0.0,1.0)
-  _save()
-  return
- if state=="menu":
-  if Rect2(w*0.18,h*0.535,w*0.64,h*0.082).has_point(pos):state="stages"
-  elif Rect2(w*0.18,h*0.617,w*0.64,h*0.082).has_point(pos):state="hangar"
-  elif Rect2(w*0.18,h*0.699,w*0.64,h*0.082).has_point(pos):state="settings"
-  elif Rect2(w*0.18,h*0.781,w*0.64,h*0.082).has_point(pos):state="help"
-  elif Rect2(w*0.18,h*0.863,w*0.64,h*0.082).has_point(pos):
-   achievements_return_state="menu"
-   state="achievements"
- elif state=="stages":
-  if Rect2(12,12,130,48).has_point(pos):
-   state="menu"
-  else:
-   for i in range(STAGE_TILE_COUNT):
-    var number:=i+1
-    if _stage_tile_rect(i,viewport_size).has_point(pos):
-     if number<=CAMPAIGN_STAGE_COUNT and number<=max_unlocked_stage:
-      _start_run(number)
-     break
- elif state=="help":
-  if Rect2(12,12,130,48).has_point(pos):state="menu"
- elif state=="stage_clear":
-  if victory_fly_time<0.90:return
-  if stage<CAMPAIGN_STAGE_COUNT and Rect2(w*0.18,h*0.60,w*0.64,h*0.085).has_point(pos):
-   _start_run(stage+1)
-  elif Rect2(w*0.18,h*0.70,w*0.64,h*0.085).has_point(pos):
-   selected_stage=mini(max_unlocked_stage,stage+1)
-   state="stages"
-  elif Rect2(w*0.18,h*0.80,w*0.64,h*0.085).has_point(pos):state="menu"
- elif state=="hangar":
-  if Rect2(12,12,130,48).has_point(pos):state="menu"
-  else:
-   var columns:=2 if w<650 else 4
-   var card_w:=w/columns
-   var card_h:=h*0.17 if w<650 else h*0.37
-   var top:=h*0.20
-   for i in range(SHIPS.size()):
-    var row:=floori(float(i)/float(columns))
-    var col:=i%columns
-    var rect:=Rect2(col*card_w+8,top+row*card_h,card_w-16,card_h-8)
-    if rect.has_point(pos):
-     var ship:Dictionary=SHIPS[i]
-     if unlocked_ships.has(ship.id):
-      _equip_ship(ship.id)
-     elif stage>=ship.stage:
-      unlocked_ships.append(ship.id)
-      _equip_ship(ship.id)
-      _check_achievements()
-      _save()
- elif state=="settings":
-  if Rect2(12,12,130,48).has_point(pos):
-   state="menu"
-  elif Rect2(w*0.18,h*0.22,w*0.64,h*0.055).has_point(pos):
-   achievements_return_state="settings"
-   state="achievements"
-  else:
-   var diff_ids:Array[String]=["easy","normal","hard","nightmare"]
-   for i in range(4):
-    var diff_rect:=Rect2(i*w/4.0+5,h*0.34,w/4.0-10,56)
-    if diff_rect.has_point(pos):
-     difficulty=diff_ids[i]
-     _save()
-     return
-   if Rect2(w*0.18,h*0.52,w*0.64,62).has_point(pos):
-    muted=not muted
-    _sync_audio()
-    if not muted and sound_bank!=null:sound_bank.start_music()
-    _save()
-   elif Rect2(w*0.18,h*0.64,w*0.64,62).has_point(pos):
-    target_fps=60 if target_fps==45 else 45
-    Engine.max_fps=target_fps
-    _save()
-   elif state=="achievements":state=achievements_return_state
- elif state=="over":
-  if pos.y>h*0.74:state="menu"
-  else:_start_run(stage)
- queue_redraw()
+  _refresh_ui(true)
+
+func _ui_set_fps(value: int) -> void:
+ target_fps=60 if value>=60 else 45
+ Engine.max_fps=target_fps
+ _save()
+ _refresh_ui(true)
+
+func _ui_add_slider(parent: Control,title: String,value: float,callback: Callable) -> void:
+ _ui_label(parent,title,18,Color("#DCE8F8"))
+ var slider:=HSlider.new()
+ slider.min_value=0.0
+ slider.max_value=1.0
+ slider.step=0.05
+ slider.value=value
+ slider.custom_minimum_size=Vector2(0,48)
+ slider.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ slider.focus_mode=Control.FOCUS_NONE
+ slider.add_theme_color_override("grabber_color",CYAN)
+ slider.add_theme_color_override("grabber_highlight_color",Color.WHITE)
+ parent.add_child(slider)
+ slider.value_changed.connect(callback)
+
+func _build_settings_ui() -> void:
+ var content:=_ui_screen(_loc("تنظیمات","SETTINGS"),_loc("زبان، صدا و تجربهٔ بازی را تنظیم کنید.","LANGUAGE, AUDIO AND GAMEPLAY OPTIONS."))
+ var language_card:=_ui_card(content,CYAN)
+ _ui_label(language_card,_loc("زبان بازی","GAME LANGUAGE"),20,Color.WHITE)
+ var language_row:=HBoxContainer.new()
+ language_row.add_theme_constant_override("separation",10)
+ language_card.add_child(language_row)
+ _ui_button(language_row,"فارسی"+(" ✓" if language=="fa" else ""),CYAN,62,Callable(self,"_ui_set_language").bind("fa"))
+ _ui_button(language_row,"English"+(" ✓" if language=="en" else ""),PURPLE,62,Callable(self,"_ui_set_language").bind("en"))
+ var audio_card:=_ui_card(content,GREEN)
+ _ui_label(audio_card,_loc("صدا","AUDIO"),20,Color.WHITE)
+ _ui_button(audio_card,_loc("صدا: روشن","SOUND: ON") if not muted else _loc("صدا: خاموش","SOUND: OFF"),GREEN if not muted else PINK,64,Callable(self,"_ui_toggle_mute"))
+ _ui_add_slider(audio_card,_loc("صدای افکت‌ها","SOUND EFFECTS"),sfx_volume,Callable(self,"_ui_set_sfx"))
+ _ui_add_slider(audio_card,_loc("صدای موسیقی","MUSIC VOLUME"),music_volume,Callable(self,"_ui_set_music"))
+ var gameplay:=_ui_card(content,PURPLE)
+ _ui_label(gameplay,_loc("گیم‌پلی","GAMEPLAY"),20,Color.WHITE)
+ _ui_label(gameplay,_loc("درجهٔ سختی","DIFFICULTY"),18,Color("#C7D9EE"))
+ var diff_grid:=GridContainer.new()
+ diff_grid.columns=2
+ diff_grid.add_theme_constant_override("h_separation",8)
+ diff_grid.add_theme_constant_override("v_separation",8)
+ gameplay.add_child(diff_grid)
+ var diff_ids:Array[String]=["easy","normal","hard","nightmare"]
+ var diff_fa:Array[String]=["آسان","معمولی","سخت","کابوس"]
+ for i in range(diff_ids.size()):
+  var label: String = str(diff_fa[i]) if language=="fa" else str(DIFFICULTIES[diff_ids[i]].label)
+  if difficulty==diff_ids[i]:label+=" ✓"
+  _ui_button(diff_grid,label,CYAN if difficulty==diff_ids[i] else PURPLE,60,Callable(self,"_ui_set_difficulty").bind(diff_ids[i]))
+ _ui_label(gameplay,_loc("نرخ فریم","FRAME RATE"),18,Color("#C7D9EE"))
+ var fps_row:=HBoxContainer.new()
+ fps_row.add_theme_constant_override("separation",8)
+ gameplay.add_child(fps_row)
+ _ui_button(fps_row,"45 FPS"+(" ✓" if target_fps==45 else ""),GOLD,60,Callable(self,"_ui_set_fps").bind(45))
+ _ui_button(fps_row,"60 FPS"+(" ✓" if target_fps==60 else ""),GOLD,60,Callable(self,"_ui_set_fps").bind(60))
+ var stats:=_ui_card(content,Color("#58718F"))
+ _ui_label(stats,_loc("آمار بازی","GAME STATISTICS"),19,Color.WHITE)
+ _ui_label(stats,_loc("انهدام‌ها: %s  •  زمان بازی: %s دقیقه  •  اجراها: %s" % [_fa_number(total_kills),_fa_number(int(total_playtime/60.0)),_fa_number(total_runs)],"KILLS: %d  •  PLAYTIME: %d MIN  •  RUNS: %d" % [total_kills,int(total_playtime/60.0),total_runs]),17,Color("#B8C9DE"))
+
+func _build_help_ui() -> void:
+ var content:=_ui_screen(_loc("آموزش پرواز","FLIGHT SCHOOL"),_loc("راهنمای کنترل و قابلیت‌ها","CONTROLS AND ABILITIES."))
+ var items:Array=[
+  [_loc("حرکت","MOVEMENT"),_loc("انگشت خود را روی میدان بازی بکشید تا جنگنده حرکت کند.","DRAG ON THE BATTLEFIELD TO STEER.")],
+  [_loc("شلیک","FIRE"),_loc("شلیک خودکار است و جنگنده نزدیک‌ترین دشمن را هدف می‌گیرد.","YOUR AIRCRAFT FIRES AUTOMATICALLY AND TRACKS THE NEAREST TARGET.")],
+  [_loc("شتاب","DASH"),_loc("دکمهٔ گرد شتاب را لمس کنید تا جنگنده سریع حرکت کند.","TAP THE ROUND DASH BUTTON TO BURST FORWARD.")],
+  [_loc("جایزه‌ها","POWER CORES"),_loc("هسته‌های جایزه، سپر، تعمیر و قابلیت‌های موقت می‌دهند.","COLLECT CORES FOR SHIELDS, REPAIRS AND TEMPORARY POWERS.")],
+  [_loc("هدف‌گیری هوشمند","SMART TARGETING"),_loc("برای مدتی شلیک‌ها مسیر خود را به سمت هدف اصلاح می‌کنند.","PROJECTILES HOME TOWARD TARGETS FOR A SHORT TIME.")],
+  [_loc("جنگندهٔ کمکی","WINGMAN"),_loc("یک جنگندهٔ کوچک کنار شما پرواز می‌کند و خودکار پشتیبانی می‌کند.","A SMALL SUPPORT FIGHTER JOINS AND ATTACKS AUTOMATICALLY.")],
+  [_loc("کمپین","CAMPAIGN"),_loc("مرحلهٔ فعلی را تمام کنید تا مرحلهٔ بعدی باز شود. پیشرفت ذخیره می‌شود.","COMPLETE A MISSION TO UNLOCK THE NEXT. PROGRESS IS SAVED.")]
+ ]
+ for item in items:
+  var card:=_ui_card(content,Color("#345C83"))
+  _ui_label(card,item[0],19,GOLD)
+  _ui_label(card,item[1],17,Color("#D3E0F2"))
+
+func _achievement_fa(id: String) -> Array:
+ var names:Dictionary={
+  "first_blood":["اولین پیروزی","اولین دشمن را شکست بده"],
+  "stage_5":["خلبان باتجربه","به مرحلهٔ پنجم برس"],
+  "stage_10":["تک‌خال حرفه‌ای","به مرحلهٔ دهم برس"],
+  "combo_10":["استاد زنجیره","به زنجیرهٔ ۱۰تایی برس"],
+  "score_10k":["امتیاز بالا","۱۰ هزار امتیاز بگیر"],
+  "score_50k":["افسانه","۵۰ هزار امتیاز بگیر"],
+  "boss_slayer":["شکارچی غول","فرماندهٔ دشمن را شکست بده"],
+  "all_ships":["فرماندهٔ ناوگان","همهٔ جنگنده‌ها را باز کن"],
+  "no_damage":["بی‌خراش","یک مرحله را بدون آسیب تمام کن"],
+  "speed_demon":["شتاب‌گیر","۵۰ بار شتاب بگیر"],
+  "survivor":["بازمانده","۳۰ دقیقه بازی کن"],
+  "killer":["ویرانگر","۵۰۰ دشمن را شکست بده"],
+  "collector":["جمع‌آورنده","۵۰ جایزه جمع کن"],
+  "perfectionist":["کمال‌گرا","۵ مرحله را با سلامت کامل تمام کن"],
+  "marathon":["ماراتن","۲۰ بار بازی را اجرا کن"]
+ }
+ if names.has(id):return names[id]
+ return ["",""]
+
+func _build_achievements_ui() -> void:
+ var content:=_ui_screen(_loc("دستاوردها","ACHIEVEMENTS"),_loc("چالش‌ها را کامل کنید و اعتبار بگیرید.","COMPLETE CHALLENGES TO EARN CREDITS."))
+ var summary:=_ui_card(content,GOLD)
+ _ui_label(summary,_loc("%s از %s دستاورد باز شده" % [_fa_number(achievements.size()),_fa_number(ACHIEVEMENTS.size())],"%d / %d UNLOCKED" % [achievements.size(),ACHIEVEMENTS.size()]),20,GOLD,true)
+ for entry in ACHIEVEMENTS:
+  var title:=str(entry.name)
+  var description:=str(entry.desc)
+  if language=="fa":
+   var fa:=_achievement_fa(str(entry.id))
+   title=fa[0]
+   description=fa[1]
+  var card:=_ui_card(content,GREEN if achievements.has(entry.id) else Color("#53617A"))
+  _ui_label(card,title,19,GOLD if achievements.has(entry.id) else Color("#9AA7BB"))
+  _ui_label(card,description,16,Color("#CBD8EA"))
+
+func _build_game_controls_ui() -> void:
+ var pause_button:=_ui_button(ui_root,"Ⅱ",GOLD,68,Callable(self,"_ui_toggle_pause"))
+ pause_button.name="PauseButton"
+ pause_button.position=Vector2(viewport_size.x-86.0,116.0)
+ pause_button.size=Vector2(68.0,68.0)
+ pause_button.custom_minimum_size=Vector2(68.0,68.0)
+ pause_button.add_theme_font_size_override("font_size",26)
+ dash_ui_button=_ui_button(ui_root,_loc("شتاب\nآماده","DASH\nREADY"),CYAN,112,Callable(self,"_ui_request_dash"))
+ dash_ui_button.name="DashButton"
+ dash_ui_button.position=Vector2(viewport_size.x-142.0,viewport_size.y-158.0)
+ dash_ui_button.size=Vector2(122.0,122.0)
+ dash_ui_button.custom_minimum_size=Vector2(122.0,122.0)
+ dash_ui_button.add_theme_font_size_override("font_size",20)
+ dash_ui_button.add_theme_stylebox_override("normal",_ui_style(CYAN,Color("#0D2741"),64))
+ dash_ui_button.add_theme_stylebox_override("hover",_ui_style(Color.WHITE,Color("#16405D"),64))
+ dash_ui_button.add_theme_stylebox_override("pressed",_ui_style(GOLD,Color("#09172B"),64))
+
+func _ui_request_dash() -> void:
+ if state=="play" and not paused and dash_cooldown<=0.0:
+  dash_requested=true
+
+func _ui_toggle_pause() -> void:
+ if state=="play":
+  paused=not paused
+  if paused and sound_bank!=null:sound_bank.stop_music()
+  elif not paused and not muted and sound_bank!=null:sound_bank.start_music()
+  _refresh_ui(true)
+
+func _ui_center_modal(title: String,subtitle: String) -> VBoxContainer:
+ var shade:=ColorRect.new()
+ shade.color=Color(0.0,0.008,0.025,0.82)
+ shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ shade.mouse_filter=Control.MOUSE_FILTER_STOP
+ ui_root.add_child(shade)
+ var center:=CenterContainer.new()
+ center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ center.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ ui_root.add_child(center)
+ var panel:=PanelContainer.new()
+ panel.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ panel.custom_minimum_size=Vector2(viewport_size.x*0.84,0)
+ panel.add_theme_stylebox_override("panel",_ui_style(CYAN,Color("#0C1B33"),24))
+ center.add_child(panel)
+ var margins:=MarginContainer.new()
+ margins.add_theme_constant_override("margin_left",16)
+ margins.add_theme_constant_override("margin_right",16)
+ margins.add_theme_constant_override("margin_top",16)
+ margins.add_theme_constant_override("margin_bottom",16)
+ panel.add_child(margins)
+ var body:=VBoxContainer.new()
+ body.add_theme_constant_override("separation",14)
+ margins.add_child(body)
+ _ui_label(body,title,30,CYAN,true)
+ _ui_label(body,subtitle,18,Color("#D4E1F1"),true)
+ return body
+
+func _build_tutorial_overlay_ui() -> void:
+ var body:=_ui_center_modal(_loc("آموزش کوتاه","QUICK TUTORIAL"),_loc("برای حرکت، صفحه را بکشید. شلیک خودکار است. برای شتاب از دکمهٔ گرد پایین استفاده کنید.","DRAG TO STEER. FIRE IS AUTOMATIC. TAP THE ROUND DASH BUTTON TO BURST FORWARD."))
+ _ui_button(body,_loc("شروع بازی","LET'S FLY"),GREEN,72,Callable(self,"_ui_finish_tutorial"))
+
+func _ui_finish_tutorial() -> void:
+ tutorial_active=false
+ tutorial_done=true
+ _save()
+ _refresh_ui(true)
+
+func _build_pause_overlay_ui() -> void:
+ var body:=_ui_center_modal(_loc("بازی متوقف شد","PAUSED"),_loc("می‌خواهید چه کار کنید؟","WHAT WOULD YOU LIKE TO DO?"))
+ _ui_button(body,_loc("ادامهٔ بازی","RESUME"),GREEN,72,Callable(self,"_ui_toggle_pause"))
+ _ui_button(body,_loc("شروع دوبارهٔ مرحله","RESTART MISSION"),GOLD,72,Callable(self,"_ui_restart_stage"))
+ _ui_button(body,_loc("تنظیمات صدا و بازی","AUDIO AND GAME SETTINGS"),CYAN,72,Callable(self,"_ui_open_settings_from_pause"))
+ _ui_button(body,_loc("بازگشت به منو","MAIN MENU"),PINK,72,Callable(self,"_ui_exit_to_menu"))
+
+func _ui_open_settings_from_pause() -> void:
+ settings_return_state="play"
+ settings_return_paused=true
+ paused=true
+ state="settings"
+ _save()
+ _refresh_ui(true)
+
+func _ui_restart_stage() -> void:
+ _start_run(stage)
+ _refresh_ui(true)
+
+func _ui_exit_to_menu() -> void:
+ paused=false
+ state="menu"
+ if sound_bank!=null:sound_bank.stop_music()
+ _refresh_ui(true)
+
+func _ui_next_stage() -> void:
+ if stage<CAMPAIGN_STAGE_COUNT:
+  _start_run(stage+1)
+ else:
+  state="stages"
+  _refresh_ui(true)
+
+func _build_game_over_ui() -> void:
+ var body:=_ui_center_modal(_loc("مأموریت ناموفق","MISSION FAILED"),_loc("امتیاز: %s   رکورد: %s" % [_fa_number(score),_fa_number(high_score)],"SCORE: %d   RECORD: %d" % [score,high_score]))
+ _ui_button(body,_loc("تلاش دوباره","RETRY MISSION"),CYAN,72,Callable(self,"_ui_restart_stage"))
+ _ui_button(body,_loc("بازگشت به منو","MAIN MENU"),GOLD,68,Callable(self,"_ui_exit_to_menu"))
+
+func _build_stage_clear_ui() -> void:
+ var body:=_ui_center_modal(_loc("مرحله با موفقیت تمام شد","MISSION CLEARED"),_loc("مرحلهٔ %s با موفقیت تکمیل شد." % _fa_number(stage),"MISSION %02d SECURED." % stage))
+ _ui_label(body,_loc("امتیاز: %s   اعتبار: %s" % [_fa_number(score),_fa_number(credits)],"SCORE: %d   CREDITS: %d" % [score,credits]),18,GOLD,true)
+ if stage<CAMPAIGN_STAGE_COUNT:
+  _ui_label(body,_loc("مرحلهٔ بعدی باز شد!","NEXT MISSION UNLOCKED!"),19,GREEN,true)
+  _ui_button(body,_loc("مرحلهٔ بعدی","NEXT MISSION"),GREEN,72,Callable(self,"_ui_next_stage"))
+ _ui_button(body,_loc("انتخاب مرحله","MISSION SELECT"),CYAN,68,Callable(self,"_ui_open_stages"))
+ _ui_button(body,_loc("منوی اصلی","MAIN MENU"),GOLD,68,Callable(self,"_ui_exit_to_menu"))
 
 func _draw() -> void:
  var size:=get_viewport_rect().size
- if size.x < 2.0 or size.y < 2.0:
-  size = Vector2(960,540)
+ if size.x<2.0 or size.y<2.0:size=Vector2(540,960)
  viewport_size=size
- # Paint the entire frame before rendering any optional background layers.
  draw_rect(Rect2(Vector2.ZERO,size),BG)
  if background_gradient!=null:
   draw_texture_rect(background_gradient,Rect2(Vector2.ZERO,size),false)
  for layer in nebula_layers:
-  var p:Vector2=layer.pos
-  var radius:float=layer.radius
-  var c:Color=layer.color
-  draw_set_transform(p,0,Vector2(radius,radius*0.35))
-  draw_arc(Vector2.ZERO,1.0,0,TAU,56,Color(c,0.18),2.0)
-  draw_arc(Vector2.ZERO,0.72,0,TAU,48,Color(c,0.10),2.0)
+  draw_set_transform(layer.pos,0,Vector2(layer.radius,layer.radius*0.35))
+  draw_arc(Vector2.ZERO,1.0,0,TAU,56,Color(layer.color,0.18),2.0)
+  draw_arc(Vector2.ZERO,0.72,0,TAU,48,Color(layer.color,0.10),2.0)
   draw_set_transform(Vector2.ZERO)
  for structure in background_structures:
   var p:Vector2=structure.pos
-  var w:float=structure.size
-  var rect:=Rect2(p.x-w*0.5,p.y-w*0.35,w,w*0.7)
+  var side:float=structure.size
+  var rect:=Rect2(p.x-side*0.5,p.y-side*0.35,side,side*0.7)
   draw_rect(rect,Color(0.02,0.035,0.075,0.45),false,1)
   draw_line(rect.position,rect.position+rect.size,Color(0.02,0.035,0.075,0.55),1)
  var grid_step:=66.0
@@ -1101,36 +1527,15 @@ func _draw() -> void:
   var gy:=y*grid_step
   draw_line(Vector2(0,gy),Vector2(size.x,gy),Color("#0D111F"),1)
  for star in stars:
-  var c: float = 0.33+0.57*star.size
-  draw_circle(star.pos,maxf(1.0,star.size*1.5),Color(c,c,minf(1.0,c+0.06),0.78))
- if touch_ripple_time>0.0:
-  var progress:=1.0-touch_ripple_time/0.25
-  draw_arc(touch_ripple_pos,12.0+progress*38.0,0,TAU,32,Color(0.43,0.92,1.0,1.0-progress),2.0)
+  var brightness:float=0.33+0.57*star.size
+  draw_circle(star.pos,maxf(1.0,star.size*1.5),Color(brightness,brightness,minf(1.0,brightness+0.06),0.78))
  if state=="play" or state=="over" or state=="stage_clear":
   screen_shake_offset=Vector2(rng.randf_range(-screen_shake,screen_shake),rng.randf_range(-screen_shake,screen_shake)) if screen_shake>0.1 else Vector2.ZERO
   draw_set_transform(screen_shake_offset,0,Vector2.ONE)
   _draw_game()
   draw_set_transform(Vector2.ZERO)
- match state:
-  "menu":_draw_menu(size)
-  "stages":_draw_stages(size)
-  "hangar":_draw_hangar(size)
-  "settings":_draw_settings(size)
-  "help":_draw_help(size)
-  "achievements":_draw_achievements(size)
-  "over":_draw_game_over(size)
-  "stage_clear":
-   if victory_fly_time>=0.90:_draw_stage_clear(size)
  if state=="play":_draw_hud(size)
- if paused:
-  draw_rect(Rect2(Vector2.ZERO,size),Color(0,0,0,0.72))
-  _text("PAUSED",Vector2(size.x*0.5,size.y*0.32),42,CYAN)
-  _text("MISSION PAUSED",Vector2(size.x*0.5,size.y*0.37),15,Color.WHITE)
-  _button(Rect2(size.x*0.2,size.y*0.43,size.x*0.6,58),"RESUME",CYAN)
-  _button(Rect2(size.x*0.2,size.y*0.54,size.x*0.6,58),"RESTART",GOLD)
-  _button(Rect2(size.x*0.2,size.y*0.65,size.x*0.6,58),"MAIN MENU",PINK)
- if tutorial_active:_draw_overlay(size,"FLIGHT TRAINING","DRAG TO MOVE • DOUBLE TAP TO DASH",GOLD)
- if flash_time>0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
+ if flash_time>0.0:draw_rect(Rect2(Vector2.ZERO,size),Color(1,1,1,flash_time*0.4))
 
 
 func _stage_tile_rect(index: int,size: Vector2) -> Rect2:
@@ -1405,47 +1810,42 @@ func _draw_enemy(enemy: Dictionary) -> void:
   draw_rect(Rect2(enemy.pos.x-bw/2,enemy.pos.y-r-12,bw*hp_frac,4),col)
  draw_set_transform(screen_shake_offset,0,Vector2.ONE)
 func _draw_hud(size: Vector2) -> void:
- var portrait:=size.y>size.x
- if portrait:
-  _text("%d" % score,Vector2(18,34),23,Color.WHITE,false)
-  _text(_ship().name,Vector2(18,58),13,_ship().primary,false)
-  for i in range(max_hp):
-   var col:=PINK if i<hp else Color("#373750")
-   draw_colored_polygon(PackedVector2Array([Vector2(22+i*25,72),Vector2(31+i*25,82),Vector2(22+i*25,92),Vector2(13+i*25,82)]),col)
-  _text("STAGE %d • WAVE %d/%d" % [stage,subwave,total_subwaves],Vector2(size.x*0.5,122),16,GOLD)
-  var bar_w:=minf(260.0,size.x*0.68)
-  var bar_x:=size.x*0.5-bar_w*0.5
-  draw_rect(Rect2(bar_x,139,bar_w,8),Color("#252D4A"))
-  var segment:=bar_w/float(maxi(1,total_subwaves))
-  for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,141,maxf(2.0,segment-4),4),GOLD)
-  _text("CR %d" % credits,Vector2(size.x*0.78,103),12,GOLD)
- else:
-  _text("SCORE %d" % score,Vector2(18,32),21,Color.WHITE,false)
-  _text("%s • CR %d" % [_ship().name,credits],Vector2(18,56),13,_ship().primary,false)
-  for i in range(max_hp):
-   var col:=PINK if i<hp else Color("#373750")
-   draw_colored_polygon(PackedVector2Array([Vector2(24+i*27,68),Vector2(33+i*27,78),Vector2(24+i*27,88),Vector2(15+i*27,78)]),col)
-  _text("STAGE %d • WAVE %d/%d" % [stage,subwave,total_subwaves],Vector2(size.x*0.5,32),17,GOLD)
-  var bar_w:=minf(320.0,size.x*0.34)
-  var bar_x:=size.x*0.5-bar_w*0.5
-  draw_rect(Rect2(bar_x,50,bar_w,7),Color("#252D4A"))
-  var segment:=bar_w/float(maxi(1,total_subwaves))
-  for sw in range(subwave):draw_rect(Rect2(bar_x+sw*segment+2,52,maxf(2.0,segment-4),3),GOLD)
- var status_y:=size.y-166 if portrait else size.y-145
- if shield:_text("AEGIS SHIELD",Vector2(18,status_y),13,CYAN,false);status_y+=22
- if overdrive_time>0:_text("OVERDRIVE %.1fs" % overdrive_time,Vector2(18,status_y),13,GREEN,false);status_y+=22
- if magnet_time>0:_text("MAGNET %.1fs" % magnet_time,Vector2(18,status_y),13,Color("#FFFF64"),false);status_y+=22
- if slow_time>0:_text("TIME DILATION %.1fs" % slow_time,Vector2(18,status_y),13,Color("#B4C8FF"),false);status_y+=22
- if targeting_time>0:_text("SMART TARGETING %.1fs" % targeting_time,Vector2(18,status_y),13,Color("#72FFC2"),false);status_y+=22
- if wingman_time>0:_text("WINGMAN %.1fs" % wingman_time,Vector2(18,status_y),13,Color("#C6A2FF"),false)
- _text("COMBO x%d" % combo,Vector2(size.x*0.5,size.y-24),16,GOLD)
- _button(Rect2(size.x-154,12,66,42),"II" if not paused else "GO",GOLD if paused else CYAN)
- _button(Rect2(size.x-78,12,66,42),"MUTE" if muted else "AUDIO",PINK if muted else CYAN)
- _draw_dash_button(size)
- if banner_time>0:
-  _text(banner_title,Vector2(size.x*0.5,size.y*0.34 if portrait else size.y*0.20),34,CYAN)
-  _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.40 if portrait else size.y*0.26),18,GOLD)
- if tutorial_active:_text("DRAG TO MOVE • DOUBLE TAP TO DASH",Vector2(size.x*0.5,size.y*0.9),18,GOLD)
+ var scale_ui:=clampf(minf(size.x/540.0,size.y/960.0),0.82,1.35)
+ var left:=18.0*scale_ui
+ var top:=24.0*scale_ui
+ draw_rect(Rect2(8.0*scale_ui,10.0*scale_ui,size.x*0.47,106.0*scale_ui),Color(0.01,0.025,0.06,0.76))
+ _text(_loc("امتیاز: %s" % _fa_number(score),"SCORE: %d" % score),Vector2(left,top+20.0*scale_ui),23,_ship().primary,false)
+ _text(_loc("اعتبار: %s" % _fa_number(credits),"CREDITS: %d" % credits),Vector2(left,top+52.0*scale_ui),18,GOLD,false)
+ _text(_ship().name,Vector2(left,top+84.0*scale_ui),16,Color("#C4D5E9"),false)
+ var heart_x:=left
+ var heart_y:=top+102.0*scale_ui
+ for i in range(max_hp):
+  var col:=PINK if i<hp else Color("#39445B")
+  draw_rect(Rect2(heart_x+i*29.0*scale_ui,heart_y,23.0*scale_ui,13.0*scale_ui),col,true)
+ var header:=Rect2(size.x*0.51,12.0*scale_ui,size.x*0.46,90.0*scale_ui)
+ draw_rect(header,Color(0.01,0.025,0.06,0.76))
+ _text(_loc("مرحلهٔ %s" % _fa_number(stage),"MISSION %d" % stage),Vector2(header.position.x+header.size.x*0.5,top+18.0*scale_ui),18,GOLD)
+ _text(_loc("موج %s از %s" % [_fa_number(subwave),_fa_number(total_subwaves)],"WAVE %d / %d" % [subwave,total_subwaves]),Vector2(header.position.x+header.size.x*0.5,top+48.0*scale_ui),16,Color.WHITE)
+ var bar:=Rect2(header.position.x+header.size.x*0.10,top+65.0*scale_ui,header.size.x*0.80,7.0*scale_ui)
+ draw_rect(bar,Color("#263650"))
+ var segment:=bar.size.x/float(maxi(1,total_subwaves))
+ for i in range(subwave):
+  draw_rect(Rect2(bar.position.x+i*segment+2,bar.position.y+1,maxf(2.0,segment-4),5.0*scale_ui),GREEN)
+ var status_y:=size.y-184.0*scale_ui
+ var status:Array[String]=[]
+ if shield:status.append(_loc("سپر محافظ فعال","SHIELD ACTIVE"))
+ if overdrive_time>0.0:status.append(_loc("قدرت شلیک: %s" % _fa_decimal(overdrive_time),"OVERDRIVE %.1fs" % overdrive_time))
+ if magnet_time>0.0:status.append(_loc("جذب جایزه: %s" % _fa_decimal(magnet_time),"MAGNET %.1fs" % magnet_time))
+ if slow_time>0.0:status.append(_loc("کندسازی زمان: %s" % _fa_decimal(slow_time),"TIME DILATION %.1fs" % slow_time))
+ if targeting_time>0.0:status.append(_loc("هدف‌گیری هوشمند: %s" % _fa_decimal(targeting_time),"SMART TARGETING %.1fs" % targeting_time))
+ if wingman_time>0.0:status.append(_loc("جنگندهٔ کمکی: %s" % _fa_decimal(wingman_time),"WINGMAN %.1fs" % wingman_time))
+ for i in range(status.size()):
+  _text(status[i],Vector2(left,status_y+i*25.0*scale_ui),16,GREEN if i%2==0 else CYAN,false)
+ _text(_loc("زنجیره ×%s" % _fa_number(combo),"COMBO x%d" % combo),Vector2(size.x*0.5,size.y-24.0*scale_ui),19,GOLD)
+ if banner_time>0.0:
+  _text(banner_title,Vector2(size.x*0.5,size.y*0.30),34,CYAN)
+  _text(banner_subtitle,Vector2(size.x*0.5,size.y*0.36),19,GOLD)
+
 
 func _draw_menu(size: Vector2) -> void:
  var t:=Time.get_ticks_msec()/1000.0
