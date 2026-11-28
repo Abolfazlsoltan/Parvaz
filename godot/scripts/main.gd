@@ -997,7 +997,6 @@ func _setup_ui() -> void:
 func _set_ui_direction() -> void:
  if not is_instance_valid(ui_root):return
  ui_root.layout_direction=Control.LAYOUT_DIRECTION_RTL if language=="fa" else Control.LAYOUT_DIRECTION_LTR
- ui_root.text_direction=Control.TEXT_DIRECTION_RTL if language=="fa" else Control.TEXT_DIRECTION_LTR
 
 func _ui_signature() -> String:
  return "%s|%s|%s|%s|%s" % [state,str(paused),str(tutorial_active),language,str(victory_fly_time>=0.90)]
